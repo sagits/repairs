@@ -64,6 +64,10 @@ place, referencing `expo/types` — the thing that declares the `global.css` sid
 generates, adds to `tsconfig.json` itself, and tells you to commit. Referencing `nativewind/types`
 a second time from `types.d.ts` would be the same declaration twice.
 
+`expo-env.d.ts` is nonetheless listed in the app's `tsconfig.json` `include`: Expo's CLI adds it
+back on every `expo prebuild`, and an `include` entry matching nothing is harmless. Left there
+rather than fought with each `pnpm e2e:build`.
+
 ## `@repairs/config` depends on `@repairs/ui`
 
 The PRD puts the NativeWind preset in `packages/config`, and the preset needs the tokens, which live
@@ -121,3 +125,58 @@ a one-line re-export file in every workspace to be found at all.
 
 The tsconfig and the preset stay in `packages/config` because both are referenced explicitly, by
 path, and neither is discovered by walking up.
+
+## Both of the Detox build's suspected hazards were duds, and a third one was real
+
+`#5` — "Detox harness: the dev client builds and one spec runs green" — flagged two unconfirmed
+hazards and asked for the outcome either way.
+
+- **cmake 4.4.3 did not break the Hermes build.** `cmake_minimum_required(VERSION <3.5)` is the
+  incompatibility, and RN 0.86's vendored Hermes does not declare one that low: `pod install` and
+  the full `xcodebuild` ran clean on cmake 4.4.3 with no `cmake@3` installed. Nothing to work
+  around.
+- **`iPhone 16-Detox` was matched by name, not created.** The device was already on the machine, as
+  that ticket said, and `.detoxrc.js` targets that name.
+- **The real one: Xcode 27 ships no launchable `Simulator.app`.** Detox tries `open -a Simulator`,
+  fails with "Unable to find application named 'Simulator'", retries for ~25s and then runs the
+  suite anyway — so the error is loud, misleading and harmless. `headless: true` on the device skips
+  the detour and takes a single spec from 62s to 20s. The simulator boots through `simctl` either
+  way; the only thing lost is the window.
+
+## The New Architecture and Detox 20.51 on RN 0.86 need no workaround
+
+`PRD.md:92` says to suspect `newArchEnabled` first if the e2e build behaves oddly, and
+`docs/research/stack-verification.md` adds that Detox's tested window stops at RN 0.84. Recorded as
+asked: with `newArchEnabled: true` untouched, the dev client built and the launch spec passed first
+time. The flag stays on.
+
+## The "Detox dev client" is a plain Debug build, not `expo-dev-client`
+
+`expo prebuild` generates an `AppDelegate` whose Debug `bundleURL()` already points at
+`RCTBundleURLProvider`, so the Debug binary loads its JS from Metro on `:8081` and launches straight
+into the app. Installing `expo-dev-client` would add a launcher screen between the launch and the
+first assertion, which every spec would then have to tap through. The name in `PRD.md` is kept; the
+dependency is not.
+
+## `pnpm e2e:test` owns Metro's lifecycle in a shell script, not in `.detoxrc.js`
+
+Detox has no concept of a bundler, and the same ticket requires `pnpm e2e:test` to work from a cold
+shell, so something has to start Metro, wait for `/status` and kill it afterwards. That something is
+`apps/both/scripts/e2e-test.sh`, which is the whole of it: ~20 lines, no new dependency. Two details
+in it are load-bearing rather than stylistic —
+
+- `set -m`, so the backgrounded `npx expo start` leads its own process group. Killing that PID alone
+  orphans the real Metro, which then holds `:8081` and breaks the next run.
+- the kill is a `trap ... EXIT`, so a failing suite still cleans up. Metro surviving a red run is
+  how `:8081` ends up occupied by a bundler serving stale code.
+
+Metro's output goes to `apps/both/metro.log` (git-ignored by `*.log`) and is printed only if it
+fails to come up, so a bundling error is recoverable without it drowning the Detox reporter.
+
+## `detox`'s install script is allowed; `dtrace-provider`'s is not
+
+Same pattern as `unrs-resolver`: committed to `allowBuilds` rather than left to an interactive
+prompt. Detox's `postinstall` compiles its own iOS framework and XCUITest runner on macOS, and
+`detox build` has nothing to inject without them, so it has to run. `dtrace-provider` is bunyan's
+optional DTrace binding for log tracing; denied, so a machine without the DTrace headers still
+installs.

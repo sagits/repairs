@@ -2,11 +2,13 @@
   "extends": "@repairs/config/tsconfig.base.json",
   "include": [
     "app",
+    "e2e",
     "*.ts",
     "*.tsx",
     "*.d.ts",
     ".expo/types/**/*.ts",
     "../../packages/*/src",
-    "nativewind-env.d.ts"
+    "nativewind-env.d.ts",
+    "expo-env.d.ts"
   ]
 }

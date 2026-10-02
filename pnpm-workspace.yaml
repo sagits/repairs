@@ -10,5 +10,12 @@ autoInstallPeers: false
 
 # pnpm refuses to install while a dependency's build script is undecided, so the decision is
 # committed here rather than left to an interactive prompt on a fresh clone.
+#
+# detox's postinstall is the one that matters: on macOS it compiles Detox's own iOS framework and
+# XCUITest bundle, and without them `detox build` has nothing to inject into the simulator.
+# dtrace-provider is bunyan's optional DTrace binding, used only for log tracing; denied, so a
+# machine without the DTrace headers still installs.
 allowBuilds:
+  detox: true
+  dtrace-provider: false
   unrs-resolver: true

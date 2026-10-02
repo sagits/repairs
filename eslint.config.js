@@ -8,6 +8,7 @@ const expoConfig = require('eslint-config-expo/flat');
 const nodeConfigOverride = {
   files: [
     'eslint.config.js',
+    '**/.detoxrc.js',
     '**/jest.config.js',
     '**/tailwind.config.js',
     'packages/config/*.js',

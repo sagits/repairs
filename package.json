@@ -8,7 +8,9 @@
     "build:web": "turbo run build:web",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "e2e:build": "turbo run e2e:build",
+    "e2e:test": "turbo run e2e:test"
   },
   "devDependencies": {
     "turbo": "^2.6.1"
