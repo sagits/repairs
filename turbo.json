@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "dev": { "cache": false, "persistent": true },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "build:web": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
+    "lint": {},
+    "typecheck": {},
+    "test": {},
+    "e2e:build": { "cache": false },
+    "e2e:test": { "cache": false }
+  }
+}

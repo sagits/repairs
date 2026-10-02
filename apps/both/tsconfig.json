@@ -1,0 +1,12 @@
+{
+  "extends": "@repairs/config/tsconfig.base.json",
+  "include": [
+    "app",
+    "*.ts",
+    "*.tsx",
+    "*.d.ts",
+    ".expo/types/**/*.ts",
+    "../../packages/*/src",
+    "nativewind-env.d.ts"
+  ]
+}

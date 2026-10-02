@@ -1,0 +1,15 @@
+{
+  "name": "@repairs/config",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "tsconfig.base.json",
+    "tailwind-preset.js"
+  ],
+  "dependencies": {
+    "@repairs/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "nativewind": "^4.2.7"
+  }
+}

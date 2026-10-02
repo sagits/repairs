@@ -1,0 +1,123 @@
+# Decisions
+
+Every choice made where `PRD.md` left something open, or where it turned out to be wrong, newest
+last. Including the ones that went the other way.
+
+## React Native is 0.86.3 and React is 19.2.3, not 0.87 and 19.3
+
+The PRD's version table lists React Native `0.87` and React `19.3`. Those are the latest *published*
+versions; they are not what Expo SDK 57 expects. `expo@57.0.26`'s own version map pins
+`react-native 0.86.3` and `react 19.2.3`, and `npx expo install` installed those. Everything else in
+the table checked out exactly, including the `tailwindcss` pin — latest Tailwind is 4.3.3 and
+NativeWind 4 does not support Tailwind 4, so `^3.4` is load-bearing.
+
+This is the drift the PRD's "always `npx expo install`" rule exists to prevent, and it caught it on
+the first commit.
+
+## `autoInstallPeers: false` costs four extra explicit dependencies
+
+Turning it off is the right call — it is what stops each package getting its own React — but it
+means every transitive peer has to be named. Four were needed before a single test would run, each
+discovered only by the failure it caused:
+
+- `@react-native/jest-preset` — `jest-expo` 57 declares it as a peer and throws a migration error
+  without it.
+- `react-native-reanimated` — the React Native Jest preset's Babel env hard-requires its plugin.
+- `react-native-worklets` — Reanimated 4 requires it as a separate peer.
+- `test-renderer` — React Native Testing Library 14 peers on this, the successor to
+  `react-test-renderer`.
+
+**This makes the PRD's "there is one native module" wrong.** Reanimated and Worklets are native too.
+It does not change the plan, but the Detox dev client has to be built after they are in place, which
+it will be.
+
+## `render` is async in React Native Testing Library 14
+
+`await render(...)`. Without the await, `screen` is never populated and every query fails with
+"`render` function has not been called", which reads like a configuration problem and is not one.
+This applies to every test in the repo from here on, and to `rerender` and `unmount` as well.
+
+## ESLint is pinned to 9
+
+`expo install` pinned `eslint-config-expo` but left `eslint` itself unpinned, so it took ESLint 10,
+and `eslint-plugin-react@7.37.5` crashes on it: `contextOrFilename.getFilename is not a function`.
+Its peer range stops at `^9.7`. Pinned to `^9` until the plugin catches up.
+
+## One TypeScript project and one Jest project, both rooted in `apps/both`
+
+The PRD already specifies this shape for Jest. The same reason applies to TypeScript: with the
+hoisted layout, `react` and `react-native` are direct dependencies of the app and sit in its
+`node_modules`, so a per-package `tsc` in `packages/ui` cannot resolve them. Rather than duplicate
+those versions into every package, there is one project that reaches over `packages/`.
+
+The cost is that `packages/*` are not independently typecheckable. The alternative — declaring
+`react` and `react-native` in every package — puts the SDK's pinned versions in four places where
+`npx expo install` only updates one.
+
+## Ambient types are committed, not generated
+
+Expo generates `expo-env.d.ts`, which is gitignored. `apps/both/types.d.ts` is committed in its
+place, referencing `expo/types` — the thing that declares the `global.css` side-effect import — so
+`pnpm typecheck` passes on a fresh clone with nothing generated yet.
+
+`className` on React Native's components comes from `nativewind-env.d.ts`, which NativeWind
+generates, adds to `tsconfig.json` itself, and tells you to commit. Referencing `nativewind/types`
+a second time from `types.d.ts` would be the same declaration twice.
+
+## `@repairs/config` depends on `@repairs/ui`
+
+The PRD puts the NativeWind preset in `packages/config`, and the preset needs the tokens, which live
+in `packages/ui`. Metro fails to bundle without the dependency declared. Kept the PRD's layout and
+declared the edge rather than moving the preset into `packages/ui`; it is acyclic, since `ui` does
+not depend on `config`.
+
+## pnpm build-script approval is committed
+
+pnpm refuses to install while a dependency's build script is undecided, and `unrs-resolver` (in the
+ESLint chain) has one. The decision is recorded as `allowBuilds` in `pnpm-workspace.yaml` rather than
+left to an interactive `pnpm approve-builds` prompt, so a fresh clone installs without a question.
+
+## The version table was verified against primary sources
+
+`docs/research/stack-verification.md` records the check, with a source for every row. Every version
+pin held. Four *compatibility claims* attached to them did not, and two of them change work that is
+still ahead:
+
+- **`@react-native-async-storage/async-storage` installs as `2.2.0`, not `^3.1`.** SDK 57's
+  `bundledNativeModules.json` pins 2.2.0, and that is what `npx expo install` resolved. 3.1.1 exists
+  on npm but no Expo SDK validates it. The PRD's `^3.1` and its own "always `expo install`" rule
+  cannot both hold; the rule wins.
+
+  It is installed in this first commit with **nothing importing it yet**, which is deliberate. The
+  session store starts using it in the next ticket, but `pnpm e2e:build` compiles native code, and
+  adding a native module after the Detox dev client is built means rebuilding it — a failure that
+  presents as a missing JS export rather than a build problem. Every native module the app will ever
+  have is therefore in place before the dev client is first built: async-storage, Reanimated,
+  Worklets, Screens and Safe Area Context.
+- **Detox officially covers React Native 0.77–0.84.** SDK 57 is 0.86, outside the tested window, and
+  Detox's docs add that "Expo integration with Detox is entirely a community-driven effort". The PRD
+  already says to suspect the New Architecture before the specs if the e2e build behaves oddly —
+  that instinct is right, and this is why.
+- **The `shadow*` props are not deprecated.** No React Native release note between 0.80 and 0.87
+  deprecates them, and the current docs recommend them for simple shadows. `boxShadow` is still what
+  the tokens use, but as a choice of one cross-platform spelling, not a forced migration.
+- **"Expo's Metro resolver expects a hoisted layout" has been stale since SDK 54**, which added
+  support for isolated installs. Hoisted is now the documented fallback. Kept, for the reason now
+  written in `pnpm-workspace.yaml`: it is what lets `packages/*` resolve the app's React.
+
+Two more for later tickets:
+
+- **The Vercel rewrite in the PRD is not how Expo documents dynamic routes** under
+  `output: "static"`. To be settled when the web target is built, not assumed.
+- **Node 22.13 is the floor** for SDK 57, now declared in the root `engines`.
+
+## ESLint's config lives at the repo root, not in `packages/config`
+
+`PRD.md:112` puts eslint in `packages/config` alongside the tsconfig and the NativeWind preset, and
+the other two are there. ESLint is the exception because flat config resolves by walking **up** from
+the working directory: one `eslint.config.js` at the root is found by `eslint .` run in any package,
+with nothing to re-export and nothing to keep in sync. A config inside `packages/config` would need
+a one-line re-export file in every workspace to be found at all.
+
+The tsconfig and the preset stay in `packages/config` because both are referenced explicitly, by
+path, and neither is discovered by walking up.

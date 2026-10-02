@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Hoisted is Expo's documented fallback layout, not its expectation: SDK 54 and later support
+# isolated installs too. Chosen deliberately, because `packages/*` resolve react and react-native
+# from the app. autoInstallPeers is off so no package can quietly acquire its own React.
+nodeLinker: hoisted
+autoInstallPeers: false
+
+# pnpm refuses to install while a dependency's build script is undecided, so the decision is
+# committed here rather than left to an interactive prompt on a fresh clone.
+allowBuilds:
+  unrs-resolver: true
