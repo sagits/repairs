@@ -64,9 +64,11 @@ place, referencing `expo/types` — the thing that declares the `global.css` sid
 generates, adds to `tsconfig.json` itself, and tells you to commit. Referencing `nativewind/types`
 a second time from `types.d.ts` would be the same declaration twice.
 
-`expo-env.d.ts` is nonetheless listed in the app's `tsconfig.json` `include`: Expo's CLI adds it
-back on every `expo prebuild`, and an `include` entry matching nothing is harmless. Left there
-rather than fought with each `pnpm e2e:build`.
+Two redundant files are committed anyway, both written by Expo's CLI during `expo prebuild`: the
+`expo-env.d.ts` entry in the app's `tsconfig.json` `include` (already matched by `*.d.ts` there) and
+`apps/both/.gitignore`, which ignores `expo-env.d.ts` a second time. Neither does anything. They are
+committed rather than deleted because `pnpm e2e:build` writes them back every time, and a file that
+returns dirty on every build is worse than a no-op that sits still.
 
 ## `@repairs/config` depends on `@repairs/ui`
 

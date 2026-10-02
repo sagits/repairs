@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 #
-# `pnpm e2e:test` from a cold shell: the Debug build loads its JS from Metro, so Metro has to be
-# running before Detox launches the app — and a Metro left behind holds port 8081 and breaks the
-# next run as badly as not starting one. Started here, waited for, killed on the way out whatever
-# happened, including a failing suite.
+# `pnpm e2e:test`: Metro started, waited for, and killed on the way out. Why it lives in a script
+# rather than in `.detoxrc.js` is in `DECISIONS.md`.
 #
-# Any arguments are passed through to `detox test`, which is how a single spec runs on its own:
+# Arguments pass through to `detox test`, which is how a single spec runs on its own:
 #   pnpm --filter @repairs/both e2e:test e2e/launch.e2e.ts
 #
 set -euo pipefail
@@ -16,21 +14,24 @@ set -m
 
 cd "$(dirname "$0")/.."
 
-log="metro.log"
-npx expo start --port 8081 >"$log" 2>&1 &
+port=8081
+log=metro.log
+
+npx expo start --port "$port" >"$log" 2>&1 &
 metro=$!
 trap 'kill -- -"$metro" 2>/dev/null || true' EXIT
 
 for _ in $(seq 60); do
-  if curl -sf http://localhost:8081/status | grep -q 'packager-status:running'; then
+  if curl -sf --max-time 5 "http://localhost:$port/status" | grep -q 'packager-status:running'; then
     ready=1
     break
   fi
+  kill -0 "$metro" 2>/dev/null || break
   sleep 1
 done
 
 if [ -z "${ready:-}" ]; then
-  echo "Metro did not come up on :8081 within 60s. Its output:" >&2
+  echo "Metro never answered on :$port. Its output:" >&2
   cat "$log" >&2
   exit 1
 fi
