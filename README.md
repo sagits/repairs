@@ -303,3 +303,35 @@ ADRs for the decisions with consequences that outlive a ticket, each one marked 
 `PROMPTS.md` is every prompt that built this, in order. `DECISIONS.md` has seventy entries, one for
 every place the PRD was left open or turned out to be wrong; where it and the PRD disagree, it is the
 one that holds, so read it before working rather than only when writing to it.
+
+## The documents in this repo
+
+Written before the skills were installed:
+
+| File | What it is |
+| --- | --- |
+| `PRD.md` | The product requirements document, and the spec everything here was built from. |
+| `prompts-PRD.md` | The conversation that produced it. |
+
+From the [Matt Pocock skills](https://github.com/mattpocock/skills), installed with
+`/setup-matt-pocock-skills` and pinned by `skills-lock.json`:
+
+| File | What it is |
+| --- | --- |
+| `CLAUDE.md` | The project instructions every agent reads, and the pointer to `docs/agents/`. |
+| `docs/agents/issue-tracker.md` | That the tracker is GitHub issues, and the `gh` commands for it. |
+| `docs/agents/triage-labels.md` | The five triage labels and what each one means. |
+| `docs/agents/domain.md` | Where the domain docs live: one `GLOSSARY.md`, `docs/adr/` at the root. |
+| `GLOSSARY.md`, `docs/adr/0001`–`0004` | Written by the skills' `/domain-modeling`. |
+| `DECISIONS.md` | The skills' convention: every place the PRD was left open or turned out wrong. |
+| `docs/research/stack-verification.md` | Written by the skills' `/research`, checking the PRD's version table against primary sources. |
+
+From neither:
+
+- `AGENTS.md` — written and re-added by `turbo` itself, not by any skill. Its first line says so: a
+  managed block of Turborepo guidance for agents. Edit it and `turbo` puts it back.
+
+Deliverables of the work rather than configuration:
+
+- `README.md` and `PROMPTS.md` — issue #16's output. `PROMPTS.md` is where the use of AI is disclosed
+  in full.
