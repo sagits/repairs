@@ -3,10 +3,10 @@
  * it — and all of it survives a restart, because the Role is persisted to AsyncStorage.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { Role, User } from '@repairs/types';
+import { createHydrationHook } from './hydration';
 
 /**
  * The two hardcoded people. There is no sign up and no credentials: picking a Role *is* signing in,
@@ -58,20 +58,10 @@ export const useSession = create<SessionState>()(
 );
 
 /**
- * Whether the persisted Role has been read back yet. Storage is asynchronous, so for the first
- * frames of a launch the store says "signed out" when what it means is "not yet asked" — rendering
- * on that answer is what flashes the Role picker at someone who is already signed in, and
- * `AppProviders` holds the splash on this.
- *
- * Hydration is an external event with a snapshot and a subscription, which is what
- * `useSyncExternalStore` is for; `useState` plus an effect would have to re-check for a hydration
- * that finished between the two. The server snapshot is `false` because the static web export has no
- * storage to read at build time.
+ * Whether the persisted Role has been read back yet. Storage is asynchronous, so for the first frames
+ * of a launch the store says "signed out" when what it means is "not yet asked" — rendering on that
+ * answer is what flashes the Role picker at someone who is already signed in, and `AppProviders` holds
+ * the splash on this. `hydration.ts` has the rest of the reasoning; the Local job store needs the same
+ * hook for the same reason, which is why it is shared rather than written out twice.
  */
-const subscribeToHydration = (onHydrated: () => void) => useSession.persist.onFinishHydration(onHydrated);
-const readHydrated = () => useSession.persist.hasHydrated();
-const notOnTheServer = () => false;
-
-export function useSessionHydrated() {
-  return useSyncExternalStore(subscribeToHydration, readHydrated, notOnTheServer);
-}
+export const useSessionHydrated = createHydrationHook(useSession);
