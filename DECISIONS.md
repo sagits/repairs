@@ -232,3 +232,24 @@ Two more things the PRD left to the implementation, settled here:
 - **The fixtures do not persist a write**, exactly as DummyJSON does not, and there is a test whose
   only job is to hold that line. A fixture server that remembered would make the write overlay look
   unnecessary while leaving it broken against the real API.
+
+## Turbo's `test` and `typecheck` were caching across changes to `packages/`
+
+Found while building `#3`, by watching `pnpm test` replay a cached pass over code that had just
+changed. Both tasks run in `apps/both` and deliberately reach over `packages/*` — that is the "one
+TypeScript project, one Jest project" decision above — but a Turbo task's hash is its own package's
+files plus the tasks it `dependsOn`, and neither declares one. Nothing in `packages/` was in the
+hash, so every edit below the app returned a stale green.
+
+`dependsOn: ["^test"]` is not the fix: `packages/*` have no `test` or `typecheck` script to depend on,
+by the same decision. Both tasks now name what they actually read:
+
+```json
+"inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/*/src/**"]
+```
+
+Verified both ways — a change under `packages/*/src` is a cache miss, an unchanged tree is still a
+hit. `lint` needs nothing, because each package lints itself.
+
+A stale green is worse than a red, and this one would have hidden a broken `packages/` change in
+every ticket from here on.
