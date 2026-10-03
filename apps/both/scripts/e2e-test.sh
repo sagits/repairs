@@ -123,7 +123,7 @@ if [ -n "${E2E_FRESH:-}" ]; then
   echo "E2E_FRESH is set: reinstalling the app."
 elif [ ! -e "$stamp" ] || [ "$binary" -nt "$stamp" ]; then
   reuse=
-  echo "The built app is newer than the last install: reinstalling it."
+  echo "No install on record for this binary, or it is newer than the last one: installing it."
 fi
 
 # shellcheck disable=SC2086 # empty means "no flag"; see above
