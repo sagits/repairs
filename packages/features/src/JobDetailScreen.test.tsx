@@ -9,16 +9,16 @@
  * restate it. The only stub is `expo-router`: the route parameter is what selects the Job under test, and
  * a pop outside a navigator has nowhere to go.
  *
- * **The claimed Job is driven here rather than on the device, and that is a gap with a reason.** A claim
- * can only be written by a Pro claiming, and the Pro's claim action does not exist yet — `#11` builds it,
- * *from this screen* among others. So the assigned Pro, and the line that replaces Cancel once a Pro holds
- * the Job, are asserted here through the real store, and `#11`'s spec is where they land on a device.
+ * **Both Pros' actions are driven here, and one of them can only be driven here.** A Job *another* Pro holds is
+ * unreachable on a device: there is exactly one Pro in this app, so a second one's claim record can only be
+ * written by a test. `pro-mine.e2e.ts` asserts the done half of the same branch on a device, and `DECISIONS.md`
+ * records why the other half cannot be.
  *
- * **A failed cancel needs a failing `DELETE` and nothing else.** The fixture server's seeded failure is an
- * id that is poison wherever an id appears, so asking it to fail the delete of a Job also fails the `GET`
- * that loads the screen — there would be no Cancel button to press. `failEveryDelete` therefore wraps
- * `fetch` one layer further out, which is the same seam the fixture server itself occupies, and leaves the
- * load alone.
+ * **A failed write needs one failing method and nothing else.** The fixture server's seeded failure is an id
+ * that is poison wherever an id appears, so asking it to fail the write of a Job also fails the `GET` that
+ * loads the screen — there would be no button to press. `failEvery` therefore wraps `fetch` one layer further
+ * out, which is the same seam the fixture server itself occupies, and leaves the load alone: `DELETE` for the
+ * cancel, `PUT` for the claim and the completion.
  *
  * `render` and `userEvent` are awaited because both are async in React Native Testing Library 14.
  */

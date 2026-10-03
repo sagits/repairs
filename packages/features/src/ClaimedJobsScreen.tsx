@@ -7,8 +7,10 @@
  * request it ever makes; the list itself is the payoff for `ADR 0002`'s snapshot: a claim record
  * carries the whole Job as it stood when it was taken, so the list renders on a cold start with an empty
  * cache and no network — which matters because the Job in question may be on page four of an API that cannot
- * be asked for one Pro's work. There is therefore no skeleton, no pull to refresh and no error state here;
- * a local read has none of those states to be in, and inventing them would be theatre.
+ * be asked for one Pro's work. There is therefore **no skeleton, no pull to refresh and no error-with-retry**
+ * here: a local read has none of those states to be in, and inventing them would be theatre. The one error this
+ * screen can show belongs to the completion's `PUT`, which is a failed action rather than a failed load, and it
+ * rolls the row back rather than offering to try again.
  *
  * **It is a `ScrollView` and not a `FlatList`,** because the list is bounded by how many Jobs one person has
  * taken rather than by a dataset: virtualising a handful of rows costs a `keyExtractor`, two groups' worth of
