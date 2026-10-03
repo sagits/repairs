@@ -84,63 +84,11 @@ pnpm --filter @repairs/both e2e:metro          # optional, in its own terminal
 pnpm e2e:test
 ```
 
-The Metro one is the only command here with no root alias, on purpose: it is a persistent task that
-wants its own terminal, and `turbo run` is not what should own it.
+## Improvements
 
-Detox runs against the `iPhone 16-Detox` simulator in Debug, which loads its JS from Metro.
-`pnpm e2e:test` starts a Metro if none is serving and kills only one it started, so an `e2e:metro`
-left running in another terminal survives run after run and every later run skips the cold bundle —
-the largest single cost in a run. A single spec runs on its own, arguments passing through to
-`detox test`:
 
-```sh
-pnpm --filter @repairs/both e2e:test e2e/login.e2e.ts
-```
-
-A spec that fails on a missing JS export usually wants `pnpm e2e:build`, not debugging: that binary
-has native code compiled into it, so a changed native module needs a rebuild rather than a reload.
-
-**One spec runs against the real DummyJSON**, and it is the one case where a warm Metro is in the way:
-
-```sh
-EXPO_PUBLIC_API=live pnpm --filter @repairs/both e2e:test e2e/live.e2e.ts
-```
-
-`EXPO_PUBLIC_*` is inlined at bundle time, so a Metro already serving is serving the value it was
-started with. `e2e-test.sh` **refuses to run** rather than reuse a bundle built with the other flag,
-because the failure it is preventing is this spec passing green against the fixtures. Stop the warm
-Metro first.
-
-## TO-DO
-
-Two tickets are open and deliberately unbuilt. Each one has a comment on the issue saying why.
-
-- **[#14 — The web target](https://github.com/sagits/repairs/issues/14).** `react-native-web`,
-  `react-dom` and a `build:web` script are installed and wired; the script has never been run and
-  nothing has been deployed. One piece of that ticket was never web-only: the tab bar was to become a
-  left sidebar at `md:` in responsive classes, so a wide tablet got it on native too. `RoleTabBar` is a
-  bottom bar on every device, which is a product gap and not only a missing platform.
-- **[#13 — Repairs Client and Repairs Pro, with parity enforced](https://github.com/sagits/repairs/issues/13).**
-  `apps/client`, `apps/pro` and `scripts/check-app-parity.mjs` do not exist. `docs/adr/0003` has the
-  reasoning, and it carries a deferred marker pointing at the issue.
-
-## what I had do with more time,
-
-In the order it would be worth doing:
-
-1. **A backend.** Status and assignee become the server's, `available` becomes a query parameter, and
-   the overlay is deleted rather than ported. Everything else on this list gets smaller.
-2. **The two role-locked apps and the parity script** (issue #13, not done), my initial idea was to create 3 apps: one for both users, one for Client user, and one for Pro user. They could share the same logic and components because of the monorepo structure.
-4. **The web target** (issue #14, not done): I would like to send this to vercel (as a web project using react native web, sharing same layout and features as native) so its easier to test
-
-## Where the design lives
-
-`PRD.md` is the spec, and the code guidelines at the top of it are the ones this repo is written to.
-`GLOSSARY.md` fixes the vocabulary — every name in the code comes from there. `docs/adr/` has four
-ADRs for the decisions with consequences that outlive a ticket, each one marked with its status.
-`PROMPTS.md` is every prompt that built this, in order. `DECISIONS.md` has seventy entries, one for
-every place the PRD was left open or turned out to be wrong; where it and the PRD disagree, it is the
-one that holds, so read it before working rather than only when writing to it.
+2. **The two role-locked apps and the parity script** (issue #13, not done): My initial idea was to create 3 apps: one for both users, one for Client user, and one for Pro user. They could share the same logic and components because of the monorepo structure.
+3. **The web target** (issue #14, not done): I would like to send this to Vercel (as a web project using react native web, sharing same layout and features as native) so its easier to test
 
 ## The documents in this repo
 
@@ -163,13 +111,3 @@ From the [Matt Pocock skills](https://github.com/mattpocock/skills), installed w
 | `GLOSSARY.md`, `docs/adr/0001`–`0004` | Written by the skills' `/domain-modeling`. |
 | `DECISIONS.md` | The skills' convention: every place the PRD was left open or turned out wrong. |
 | `docs/research/stack-verification.md` | Written by the skills' `/research`, checking the PRD's version table against primary sources. |
-
-From neither:
-
-- `AGENTS.md`, which `turbo` writes and re-adds itself. Its first line says as much: a managed block of
-  Turborepo guidance for agents. Edit it and `turbo` puts it back.
-
-Deliverables of the work rather than configuration:
-
-- `README.md` and `PROMPTS.md` are issue #16's output, and `PROMPTS.md` is where the use of AI is
-  disclosed in full.
