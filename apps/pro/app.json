@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Repairs Pro",
+    "slug": "repairs-pro",
+    "scheme": "repairs-pro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.renatoprobst.repairs.pro",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.renatoprobst.repairs.pro"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

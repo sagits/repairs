@@ -1,6 +1,7 @@
 /**
- * Every screen in the app. `apps/both/app/` is a thin shell that re-exports from here; the two
- * role-locked apps `ADR 0003` plans would be the same shell again, and are deferred (issue #13).
+ * Every screen in all three apps. `apps/both/app/`, `apps/client/app/` and `apps/pro/app/` are the same
+ * thin shell of re-exports from here, three times over, and `pnpm check:apps` fails if they ever stop
+ * being — `ADR 0003` is the argument for why that is checked rather than claimed.
  */
 export { AppProviders } from './AppProviders';
 export { AppRoleProvider, useAppRole } from './appRole';
@@ -15,3 +16,4 @@ export { RoleGuard } from './RoleGuard';
 export { RoleTabBar } from './RoleTabBar';
 export { SettingsScreen } from './SettingsScreen';
 export { TabsLayout } from './TabsLayout';
+export { WebShell } from './WebShell';

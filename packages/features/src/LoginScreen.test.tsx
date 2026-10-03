@@ -14,12 +14,20 @@
  * `expo-router` is stubbed because the screen redirects once a Role is set, and a `Redirect` outside a
  * navigator has nowhere to go. Where it redirects *to* is the Detox spec's business.
  *
+ * The role-locked builds get the last two tests, and they are rendered inside an `AppRoleProvider` while
+ * every test above is rendered without one. That asymmetry is the subject rather than an inconsistency:
+ * `appRole` defaults to `'both'`, deliberately, so a screen rendered outside the provider behaves as the
+ * shared app — which is the case the first nine tests are about. The two below are the only ones that
+ * have anything to declare.
+ *
  * `render` and `userEvent` are awaited because both are async in React Native Testing Library 14.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { SESSION_STORAGE_KEY, useSession } from '@repairs/stores';
+import { AppRoleProvider } from './appRole';
 import { LoginScreen } from './LoginScreen';
+import type { AppRole } from '@repairs/types';
 
 jest.mock('expo-router', () => ({ Redirect: () => null }));
 
@@ -142,4 +150,30 @@ it('persists the Role and neither the email nor the password', async () => {
   const persisted = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
   expect(persisted).not.toContain(AN_EMAIL);
   expect(persisted).not.toContain(A_PASSWORD);
+});
+
+const renderLockedTo = (appRole: AppRole) =>
+  render(
+    <AppRoleProvider value={appRole}>
+      <LoginScreen />
+    </AppRoleProvider>,
+  );
+
+it('drops the Role switch in a role-locked build, leaving the one Login button', async () => {
+  await renderLockedTo('pro');
+
+  expect(screen.queryByRole('button', { name: 'Client' })).not.toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: 'Pro' })).not.toBeOnTheScreen();
+  expect(login()).toBeOnTheScreen();
+});
+
+it('signs in as the Role the build is locked to, with nothing on screen to choose it', async () => {
+  const user = userEvent.setup();
+  await renderLockedTo('pro');
+
+  await fillCredentials(user);
+  await user.press(login());
+
+  expect(useSession.getState().role).toBe('pro');
+  expect(useSession.getState().user?.name).toBe('Mike Sullivan');
 });

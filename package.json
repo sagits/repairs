@@ -8,9 +8,10 @@
     "build:web": "turbo run build:web",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "check:apps": "node scripts/check-app-parity.mjs",
     "test": "turbo run test",
-    "e2e:build": "turbo run e2e:build",
-    "e2e:test": "turbo run e2e:test"
+    "e2e:build": "turbo run e2e:build --concurrency 1",
+    "e2e:test": "turbo run e2e:test --concurrency 1"
   },
   "devDependencies": {
     "turbo": "^2.6.1"

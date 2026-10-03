@@ -1380,6 +1380,172 @@ All four get one, so that a missing marker never has to be interpreted:
   picker that `#2`'s login form replaced. The id-13 decision the ADR is about is untouched, so the sentence
   is annotated rather than rewritten.
 
+## The way back out is a drawn chevron in the band, not the navigation bar's own back button
+
+Asked for "the default arrow icon from expo navigation that shows on left area of navigation bar", which
+has two readings, and they are not close together.
+
+The literal one is `headerShown: true` on the pushed routes, which hands over the real native back button —
+arrow, swipe-back gesture, platform correctness, all free. It was not taken. The Stack's header would sit
+*above* `HeaderBand`, so either every pushed screen carries two headers or the band comes off those screens
+and the teal is tinted onto the native one instead. That second version is a bigger change than it sounds:
+the band is the status bar's backdrop by way of `pt-16`, the two pushed screens would stop looking like the
+tabbed ones, and the `testID`s four Detox specs tap would go with it in favour of a system-level matcher —
+the exact cost `Alert.alert` was turned down for twice.
+
+So the band keeps the control and the control becomes the icon. `BackButton` draws the iOS chevron out of
+two rotated `View`s, which is what the no-icon-font decision leaves available and what `GlyphFrame` already
+does for the illustrations. `HeaderBand` grew a `leading` slot beside `action` to put it on the left, where
+the ask was really about: the pill said "Back" on one screen and "Cancel" on the other, and both words moved
+into `accessibilityLabel`, so every existing assertion still finds them.
+
+## The destructive confirm is a `Modal` now, and that is what finally made it a component
+
+Twice recorded as staying inline and staying local — "nine props for two call sites" — and both entries are
+now overtaken, by a direct ask for a dialog over a dimmed screen rather than a card pushed into the layout.
+
+`Alert.alert` is still not it, for the reason it was never it: a separate element tree that React Native
+Testing Library cannot see unmocked and that Detox reaches on iOS only through system matchers. React
+Native's `Modal` is the ready-made piece that was actually wanted — it owns the window above the app, the
+fade and the hardware back button — while the contents stay ordinary views both seams drive with nothing
+stubbed. `transparent` plus one scrim `View` is the dark wash; the colour is a new `scrim` token, ink at 45%.
+
+That plumbing is what tipped the extraction. The duplication before was twenty lines of JSX neither screen
+had an opinion about losing; the duplication now would include the window, the scrim, the centring and the
+hardware-back path, which is chrome, not content. `ConfirmDialog` lives in `@repairs/ui` and both callers
+pass their own words and `testID`s. The scrim is deliberately not pressable — every caller is asking before
+something irreversible, and a stray tap outside is not consent.
+
+One consequence worth naming: on the Job screen the trigger and the confirm are both labelled "Cancel job",
+so the trigger unmounts while the question is up rather than sitting unreachable under the scrim. Two
+identical labels on screen at once is worse for a screen reader than for the eye.
+
+## Settings is a profile, not a titled list
+
+Asked for the shape in the reference screenshot: the teal running down behind a round avatar, the name and
+the address on it, and one white card lapping over the bottom of the band with every action as a row.
+`HeaderBand` came off this screen entirely — there is no "Settings" title in that shape, and the tab bar
+already says where you are.
+
+The avatar is drawn rather than shipped. There is no avatar upstream, so a bundled photograph would be
+fiction and initials in a circle would be a different person's every Role switch; a silhouette clipped by
+its circle is the honest generic, and it is `View`s for the same want of an icon font as everything else.
+
+What the rows do not have is the reference's leading icons, for that same reason — hand-drawing ten of them
+would be ten illustrations, not a layout. The row labels carry it alone. Nor is there a "Check for updates"
+footer: there is no update channel to check.
+
+The rows are built as a list and mapped, rather than written out, because which of them exist is the one
+variable thing on the screen — the Role lock takes the first away — and the dividers have to follow it.
+
+## The parity check compares more than the route trees, because the route trees do not stand alone
+
+`PRD.md:164` and `ADR 0003` both describe `scripts/check-app-parity.mjs` as diffing the three `app/`
+directories, and that alone would have left the ticket's own claim half-checked. `app/_layout.tsx` imports
+`../fixtures` and `../dev-reset`, which are between them a couple of hundred lines of test seam, and the
+other apps need their own copies for the import to resolve — so a diff scoped to `app/` would have
+enforced parity over seven one-line re-exports while the files they pull in drifted unwatched. The build
+config is the same story one step out: `metro.config.js`, `babel.config.js`, `tailwind.config.js`,
+`tsconfig.json`, `global.css`, `types.d.ts`, `nativewind-env.d.ts` and `scripts/e2e-test.sh` are identical
+in all three apps and have no reason not to be.
+
+So the script compares `app/**` plus a named list of ten shared files, and `app.json`, `package.json`,
+`.detoxrc.js` and `e2e/` are the deliberate omissions — the first three carry the name, the slug, the
+bundle identifier and the built binary's name, and `e2e/` differs because the shared app has eight specs
+and the role-locked pair have the one spec that is about being role-locked. It also fails if an
+`apps/*/src/` ever appears, which is `ADR 0003`'s own definition of the architecture having failed and the
+one failure a diff cannot see: a file only one app has is a file nothing is compared against.
+
+**The hole left open is that a shared file added to `apps/both` and not to the list is checked nowhere.**
+Every rule that would close it — "every root-level `.ts` file", "everything not in this other list" —
+needs its own exception list, which is the same list spelled twice with one copy able to rot. The list is
+named in the script's header as the thing to extend.
+
+One small change to `apps/both` fell out of this: `scripts/e2e-test.sh` now reads the built `.app` out of
+`.detoxrc.js` rather than spelling out `Repairs.app`, the same way it already reads the simulator's name
+from there. The bundle is named after the app, so the literal would have been the one line that differed
+between the three copies of a script the parity check compares. Verified by reading the path back; the
+value is byte-identical to the literal it replaced.
+
+## The login form derives its Role from `appRole`, which is the second half of a `#6` deferral
+
+`#6` recorded that `PRD.md:641` asks `appRole` to do two things — hide the Role switcher and pin the Role
+so the role-locked apps need no picker — and that only the first was built, because the second had no app
+to be true of. It does now. `LoginScreen` reads `useAppRole()`, renders the Role switch only under
+`appRole === 'both'`, and seeds its state with the locked Role otherwise. That is the whole of "one login
+button for its Role": the button was always one, and what the role-locked builds drop is the *choice*
+above it.
+
+`PRD.md:653` describes this as a button list — "the same screen, one button … derived from `appRole`" —
+because the login screen was a Role picker when that was written and is a credential form now. The
+derivation survived the rewrite; the two buttons it was derived into did not.
+
+## The role-locked apps have no Jest seam of their own, and `app.json` is not the only per-app file
+
+`ADR 0003` names "three Jest configs" among the costs of the split. They are not here, and that is the one
+place this implementation declines something the ADR priced in. The Jest project is rooted in `apps/both`
+and reaches over `packages/`, which is where everything under test lives, so a second and third copy would
+run the same 215 tests against the same files and report the same result three times. It would treble the
+suite and assert nothing new — and the thing it looks like it would catch, a role-locked app whose screens
+behave differently, cannot happen, because `appRole` is the only input that differs and
+`LoginScreen.test.tsx` and `SettingsScreen.test.tsx` both drive it directly through `AppRoleProvider`.
+
+The `test` script is therefore absent from `apps/client/package.json` and `apps/pro/package.json`, which is
+the only difference between them and `apps/both`'s besides the package name. Their `devDependencies` are
+kept identical even so, Jest's included: `tsconfig.json` includes `../../packages/*/src`, which is where
+the tests live, so `tsc` in a role-locked app typechecks `@testing-library/react-native` and `@types/jest`
+whether or not that app ever runs a test.
+
+What each new app does carry of its own is `app.json` (name, slug, scheme, bundle identifier),
+`package.json`, `.detoxrc.js` and one Detox spec. The `.detoxrc.js` is the one that will bite: `expo
+prebuild` builds the Xcode project from `app.json`'s `name` with every non-word character stripped, so
+"Repairs Client" becomes `RepairsClient` and that string is the workspace, the scheme and the `.app`.
+Renaming the app means renaming it in two files, and the symptom of forgetting is `xcodebuild` failing on
+a missing workspace.
+
+## CI is the parity check and nothing else, on purpose
+
+This repo had no CI at all before `#13`, and the ticket asks for one thing from it: that the parity check
+runs there. `.github/workflows/ci.yml` runs exactly that and nothing more.
+
+The temptation was to add `pnpm typecheck`, `pnpm lint` and `pnpm test` while the file was open. They are
+left out because they have only ever been run on one macOS machine with Xcode present, and a pipeline
+nobody has watched go green is the same unexecuted claim `ADR 0003` rejects — with the added cost that a
+CI badge which is red on arrival teaches everyone to ignore CI. The parity check is the opposite case: it
+is plain Node with no dependencies, so the job is a checkout, a Node, and the script, and what runs there
+is exactly what runs locally. It is invoked as `node scripts/check-app-parity.mjs` rather than through
+`pnpm check:apps` for the same reason — installing pnpm to run a script that needs no install would be the
+only slow step in the job.
+
+Adding the other three is `actions/setup-node` with `cache: pnpm` and `pnpm install --frozen-lockfile`,
+and it should be done by whoever can watch it fail.
+
+## `README.md`'s improvements list still says `#13` is not done
+
+The README's `## Improvements` section is Renato's own first-person text, kept verbatim by the resolution
+recorded above, and its second item reads "The two role-locked apps and the parity script (issue #13, not
+done)". That is now wrong, and it is left alone rather than rewritten: it is his account, not a
+description of the code, and an agent editing his voice to keep a status line current is a worse trade
+than a stale line. Flagged here and in the handover so he can strike it himself.
+
+## The root Detox scripts are serialised, because there are three apps and one simulator
+
+`pnpm e2e:build` and `pnpm e2e:test` were `turbo run …` with nothing holding them back, which was correct
+while `apps/both` was the only app with those scripts. With three, turbo would run them in parallel, and
+all three want the same two things at once: Metro's port 8081 and the one booted `iPhone 16-Detox`. Three
+Metros cannot have the port and three Detox runs cannot have the device, so the first symptom would have
+been a mess of launch failures that look nothing like the cause.
+
+Both root scripts now pass `--concurrency 1`. That is the whole fix, and it is on the root script rather
+than in `turbo.json` because turbo's concurrency is a run-level flag and not a per-task one. The
+consequence is the honest one: the device suite now takes three times as long to build and to run, which
+is `ADR 0003`'s "three of everything" arriving in the one place it costs wall-clock time. `pnpm --filter
+@repairs/client e2e:test` is still the way to run one app's specs alone.
+
+**Neither root script has been run since this change.** `#13` was implemented without Detox, by request,
+so the serialisation is reasoned rather than measured and the two new apps have never been prebuilt. The
+first `pnpm e2e:build` on this branch is the real test of the `.detoxrc.js` names.
+
 ## The web target is un-deferred, and the custom `tabBar` the PRD's route tree names cannot carry the sidebar
 
 `#14` was deferred part way through `/implement-spec` and is now built. The deferral entry's three
@@ -1443,3 +1609,18 @@ It is left alone because the fix is a product decision rather than a web one: th
 target is what the Job list is, and the only way out is to shrink it to a title that opens and a button
 that claims. That is a change to how the app behaves on a phone, made to satisfy a validator the phone does
 not run, and it is not this ticket's to make. Worth its own issue.
+
+**What merging `#13` first changed about this, which is two things and one admission.** The web shell was
+written as `apps/both/app/+html.tsx`, and with three apps that is a route `pnpm check:apps` finds in one of
+them — correctly, because it is a route and the three route trees are meant to be the same. So it went the
+way every other route goes: `WebShell` in `@repairs/features`, and three byte-identical one-line
+re-exports. And `vercel.json`'s build command is `pnpm --filter @repairs/both build:web` rather than the
+bare `pnpm build:web` the PRD names, because the bare one now exports three static sites to deploy one.
+
+The admission is that **`/job/[id]` and `/job/new` stay full-bleed past the breakpoint.** They are pushed
+Stack routes outside `(tabs)`, so the container that centres the content is not above them, and opening a
+Job from a centred list widens it to the window. The acceptance criterion is about the tab bar and what
+sits beside it, and this is not that — but it is visible, and the fix is a real one rather than a class:
+the centring would have to move from `TabsLayout` down into `Screen`, where every route picks it up, and
+that is a layout change to all eight screens with a Detox suite to re-run behind it. Not smuggled in
+under a merge.

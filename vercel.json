@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm build:web",
+  "buildCommand": "pnpm --filter @repairs/both build:web",
   "outputDirectory": "apps/both/dist",
   "cleanUrls": true,
   "rewrites": [{ "source": "/job/:id", "destination": "/job/[id]" }]

@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Repairs Client",
+    "slug": "repairs-client",
+    "scheme": "repairs-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.renatoprobst.repairs.client",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.renatoprobst.repairs.client"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,9 +1,10 @@
 /**
- * The root layout, and the only file that will differ between the three apps once they exist: the
- * Role lock is passed to `AppProviders` here. Importing the stylesheet is what loads NativeWind's
- * base layer, and importing `../fixtures` is what installs the fixture server over `fetch` when the
- * build was started with `EXPO_PUBLIC_API=fixtures` — before any screen has had a chance to ask for
- * anything, which is the whole requirement on where that import goes.
+ * The root layout, and the only file that differs between the three apps: the Role lock is passed to
+ * `AppProviders` here, and `pnpm check:apps` fails on any other difference between them. Importing
+ * the stylesheet is what loads NativeWind's base layer, and importing `../fixtures` is what installs
+ * the fixture server over `fetch` when the build was started with `EXPO_PUBLIC_API=fixtures` — before
+ * any screen has had a chance to ask for anything, which is the whole requirement on where that
+ * import goes.
  *
  * `../dev-reset` is the same shape and here for the same reason — a URL listener that has to be
  * registered before a link can arrive. It is `__DEV__`-only and empties both persisted stores, so a
