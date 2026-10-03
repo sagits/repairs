@@ -1,6 +1,7 @@
 /**
  * Available jobs on the device: the first page behind its skeleton, the posting Client as an id, a second
- * page arriving on a scroll without the first one going anywhere, and the error state with its Retry.
+ * page arriving on a scroll without the first one going anywhere, the error state with its Retry, and the
+ * claim — rolled back once, then taken.
  *
  * **Rows are matched by `testID` and never by title.** The fixtures derive a title from `id % 12`, so
  * every twelfth row reads the same sentence — `by.text('Hallway light flickers')` matches twenty-one
@@ -47,6 +48,7 @@ const A_DONE_ROW = 'available-job-7';
 
 /** The method-naming half of the fixtures bridge. `fixtures.ts` has the mechanism and the argument. */
 const EVERY_READ_FAILS = 'repairs:///?fixtureFail=GET';
+const EVERY_WRITE_FAILS = 'repairs:///?fixtureFail=PUT';
 const A_WORKING_SERVER = 'repairs:///?fixtureFail=';
 
 const waitForVisible = (testID: string) =>
@@ -145,6 +147,28 @@ describe('pro available jobs', () => {
 
     await waitForGone('retry-available-jobs');
     await expectElement(element(by.id(`available-job-${ON_PAGE_ONE.id}`))).toBeVisible();
+  });
+
+  /**
+   * The rollback, on a device, which is the thing this ticket extended the fixtures bridge to make possible.
+   * `#8` and `#9` both had to drive their failed mutation in Jest alone because the bridge rewrote URLs and
+   * a create's poison is in its body; naming a **method** reaches a write with no id of its own.
+   *
+   * The claim is written to the store before the `PUT` leaves, so for a moment the row really is gone — and
+   * then the request fails and it comes back, with the server's own words above it. The row returning is the
+   * assertion: it is the difference between an optimistic write and a lie that happened to be told first.
+   */
+  it('puts the row back with the failure above it when the claim does not reach the server', async () => {
+    await availableJobs().scrollTo('top');
+    await device.openURL({ url: EVERY_WRITE_FAILS });
+
+    await element(by.id(`claim-job-${ON_PAGE_ONE.id}`)).tap();
+
+    await waitForText('Could not claim this job');
+    await expectElement(element(by.text('Fixture failure seeded for id 9001'))).toBeVisible();
+    await expectElement(element(by.id(`available-job-${ON_PAGE_ONE.id}`))).toBeVisible();
+
+    await device.openURL({ url: A_WORKING_SERVER });
   });
 
   /**
