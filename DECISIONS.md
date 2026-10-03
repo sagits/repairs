@@ -782,3 +782,91 @@ the press can simply be repeated.
 Recorded because `#11` — "A Pro claims an open job" — and `#12` — "A Pro completes a job they hold" — will
 want a failed mutation on a device, and the work is to extend `redirect` in `fixtures.ts` to rewrite a
 create's body as well as the URL. Two lines, in the one place that already knows about `fixtureUser`.
+
+## The detail screen overlays the claim but not `deleted`, because it is usually the screen doing the cancelling
+
+`applyOverlay` drops a cancelled Job before it does anything else, which is right for a list and wrong for
+exactly one screen. `useJob` therefore lays on the claim alone — `overlayClaim`, lifted out of `prepareRows`
+so the two share one definition — and never filters on `deleted`.
+
+The reason is the order a cancel happens in. The store write comes first and the request second, so between
+the two there is a Job recorded as cancelled and a screen still showing it. A `select` that filtered on
+`deleted` would blank that screen into "No such job" while the `DELETE` was still in flight, and then pop
+back to the list anyway. **The row being gone belongs to the list behind it**, which is where both specs
+assert it.
+
+The cost is that a cancelled Job reached by hand — a deep link to `job/<id>` — renders as open with a Cancel
+button that returns quietly, which is the store's already-cancelled case doing its job. Nothing in the app
+links to one, because no list shows it. The alternative would be a fourth thing for this screen to render
+that no requirement asks for.
+
+## Two more ways a green Jest run refuses to exit, and both are react-query
+
+`#8` recorded the first: a settled mutation holds a five-minute garbage-collection timer that
+`queryClient.clear()` does not clear, so every test client needs `mutations: { gcTime: 0 }`. This ticket
+found two more with the same symptom — a green suite, then minutes of nothing — and `--detectOpenHandles`
+reports neither.
+
+**A `retry` predicate on a query replaces the test client's `retry: false` wholesale.** `useJob` first
+shipped with `retry: (failures, error) => !isNotFound(error) && failures < 2`, so that a 404 cost one request
+rather than three before the not-found screen it already knows to show. Query-level options beat the
+client's defaults, so every test of a *failing* detail request started retrying twice against the fixtures'
+600ms delay: one assertion blew RNTL's 1s `waitFor`, and the pending retry timer then held the process open.
+The predicate was deleted rather than worked around. It bought a device about a second on a screen nothing is
+timing, and it cost every future test of that hook three requests per failure — a 404 is now retried like
+anything else, which looks wrong and is the cheaper of the two wrongs.
+
+**A refetch still in flight when a test unmounts the screen holds the process open too.** A successful cancel
+invalidates `['jobs']`, which refetches the Job the screen is showing, and the test ended as soon as the pop
+had happened — with the request out. `queryClient.clear()` in `afterEach` does not settle it. One
+`await waitFor(() => expect(queryClient.isFetching()).toBe(0))` fixes it, and it is a better assertion than
+the one it follows: that refetch is `ADR 0002`'s invariant, the server answering with the todo still present
+and the overlay dropping it again. **`#11` and `#12` invalidate from a mounted screen in exactly the same way
+and owe the same line.**
+
+## The second in-app confirm stays local to its screen, so there is still no shared one
+
+`#6` left this open on purpose: "one in-app confirm is not yet a component, and the second one is what will
+say what the shared shape should be." The second one is here, cancelling a Job, and the answer is that they
+stay apart.
+
+Settings' confirm clears Local job data synchronously and has nothing to report. This one awaits a request,
+so its confirm button carries a spinner and a disabled state, and a failure renders a card above it in the
+server's own words. One `@repairs/ui` component serving both means a title, a body, two labels, two
+`testID`s, `onKeep`, `onConfirm` and `pending` — nine props for two call sites, which is more to understand
+than the twenty lines of JSX it would save. A third confirm is when the shape is worth naming.
+
+What *was* shared is the pair of strings two screens now have to get identically right: `proName` and the
+date formatter moved out of `PostedJobsScreen` into `jobText.ts`. Two callers earn a file; one did not.
+
+## The claimed Job and the failed cancel are driven in Jest, because neither is reachable on the device yet
+
+`client-detail.e2e.ts` covers the status, the posting Client, the missing description, the not-found screen
+and the whole cancel — asked, declined, confirmed, gone, still gone after a refetch and after a restart. Two
+of this ticket's assertions sit in `JobDetailScreen.test.tsx` instead.
+
+**A claim can only be written by a Pro claiming, and that action does not exist yet.** So the assigned Pro's
+name, the day they took it, and the line that replaces Cancel once a Job has left `open` are asserted through
+the real store in Jest. Seeding a claim through a `__DEV__` deep link was considered and rejected: it would
+be a backdoor into the production store, carrying a snapshot nothing minted, whose only user disappears when
+**`#11`** claims from this very screen. **`#11` owes the device assertion**, and it is one `waitFor` after its
+own claim.
+
+**A failed cancel cannot be reached on the device at all.** The fixture server poisons `9001` wherever an id
+appears, so an id whose `DELETE` fails also fails the `GET` that loads the screen — there would be no button
+to press. That is `#8`'s failed-create problem in a new place and it gets the same answer: the Jest test
+wraps `fetch` one layer further out to fail every `DELETE` and leave the load alone, which is the same seam
+the fixture server itself occupies. If `#11` or `#12` extends `fixtures.ts` to rewrite a request body as that
+entry suggests, failing by **method** is a second line in the same place.
+
+## The deep-link test goes last in a spec, because the link pushes a route with nothing to pop to
+
+`client-detail.e2e.ts` reaches the not-found screen with `device.openURL({ url: 'repairs:///job/9999' })`,
+which works first time — and the first draft put that test in the middle, where it cost three cascading
+failures. Tapping Back on a deep-linked route does not return to the list: the route arrived without a
+history behind it, so the pop is a no-op and every test after it starts on a screen it did not expect, each
+failing on a 30-second matcher for a row that was never on screen.
+
+Reordering is the whole fix, and it generalises: **a test that arrives somewhere by deep link cannot be
+relied on to leave.** Put it last, or relaunch after it. `#6`'s guard spec gets away with it because a
+redirect is what it is asserting, so the link's destination is a screen the app chose.
