@@ -1,16 +1,47 @@
 # Repairs
 
-A repair-jobs app where two kinds of people share one app: a **Client** posts repair jobs and tracks
-them, a **Pro** picks them up. There is no sign up and no credentials — you sign in by picking a Role,
-and that Role is the whole of your identity, which is what makes both sides reachable on one device
-against one dataset.
+- A repair-jobs app where **two kinds of users share the same app** and see different things
+- Client user: Posts repair jobs and tracks them
+- Pro user: Picks up jobs and completes them
+- Monorepo with shared packages to share the same screens, components, and logic between multiple apps (so we can split the original app into 2 different apps in the future, and share code with any React web projects)
+- API requests done with TanStack react Query (to dummyjson.com/todos) and augmented with local Zustand store saved data to save the result from the POST/PUT/DELETE requests and still have the app calling a normal API with TanStack React Query (because using React Query for requests/requests cache and zustand/redux for what needs to be persisted/changed locally is what apps usually do)
 
-## The shape of it
+## Architecture
 
-A pnpm workspace driven by turbo, where `apps/both` is a thin shell and everything that could be
-shared is. The app directory holds Expo Router routes and almost nothing else: each route file names
-a screen from `packages/features` and, where only one Role may reach it, wraps it in a guard. All of
-the work lives in the packages.
+- **Expo** (SDK 57, the current latest — managed workflow) + **Expo Router** (file-based routing,
+  typed routes)
+- **TypeScript** (strict)
+- **NativeWind** + React Native primitives for layout — no component library
+- **TanStack Query v5** — every request, and its cache
+- **Zustand** (+ `persist`) — session, the local job store, form drafts
+- **React Hook Form** + **Zod** (`@hookform/resolvers/zod`) — form state and validation, and the
+  schema at the API boundary
+- **React Native Web** — the same source ships to the browser, deployable to Vercel
+- **Turborepo** monorepo (pnpm workspaces)
+- **Detox** — end-to-end tests, one spec per feature
+- **Jest + React Native Testing Library** — integration tests at the state and interaction seams
+- **Matt Pocock** — Set of skills for AI assisted development using specs. It can turn a spec or product requirement document (like PRD.md) into several tickets that can be worked on by agents using TDD and e2e (if specified on the spec like I did)
+- **Git worktree** - I used git worktrees to be able to work on multiple PRs at the same time
+- **PRD.md** - Product requirement document that I created with all the technical decisions and the architecture that I want to use on this project (including following the Turno design system)
+
+## Workflow
+
+This is how I implemented the stack, features, and screens. I used AI-assisted development, but I was in front of the computer giving prompts, validating, testing, and requesting changes during the entire 10 hours of development:
+
+1. Defined a product requirements document (PRD.md) with the stack, technical decisions, features and how to build it. I choose all the technologies based on my experience with React Native (use the same libraries we use on production), and I chose to add a monorepo so we can split the single app into 2 different apps inside the same repo and reuse code across them. I also choose to use react-native-web so we can also ship to react web if we decide too (it automatically converts react native components to react web components). A Claude Code agent helped me generate the PRD based on my architectural decisions and on the Turno Design system (color tokens) that I already had on this other project https://github.com/sagits/sweep-public.
+2. Created an empty repo on github
+3. Used a spec library to turn the PRD (that can also be read as a spec) into multiple tickets so we can use agents to implement each feature along with the e2e and integration tests. There are many AI libraries we can use for this like superpowers, GSD, Spec Kit, etc. I decided to use https://github.com/mattpocock/skills
+4. Install https://github.com/mattpocock/skills skills locally on the project and follow its readme to configure it (it creates issues on the repo for the tickets we generate using it)
+5. used /domain-modeling @PRD.md to generate some information about the PRD that would be shared across every agent that touches code on this repo
+6. use /to-tickets @PRD.md. It showed me how it would break this PRD into tickets and asked me to review it. Once we decided how I want the tickets, the order, how many tickets, and I corrected any AI deviation, it created the tickets as issues on GitHub
+7. I used /implement #1 to setup the structure of the project (it works on the first issue that was the project structure). I tested it to guarantee it works
+8. I used /implement #5 to setup detox tests. Ai was going to do this later, but I prefer to do it first so we guarantee the e2e tests are working before we do anything else (we need to install detox, boot the simulator, if this breaks AI would try to generate the code without testing itself). I manually tested it to guarantee it was working
+9. I used /implement-spec to implement the rest of the tickets on a single branch and tested the end result for any necessary changes
+10. I prompted AI to add a login screen because it deviated from the login screen and added only two buttons to choose the user type on the app home (it was working, but didn't mimic what a real app would have)
+11. Tested the entire app and made the necessary changes (on visual and code). Rerun detox tests and integration tests and asked AI to fix what broke after my changes
+
+`apps/both` is a thin shell: each route file under `app/` names a screen from `packages/features` and,
+where only one Role may reach it, wraps it in a guard. The rest lives in the packages.
 
 | Package | What is in it |
 | --- | --- |
@@ -81,27 +112,6 @@ in a card above the list.
 holds the job and when they finished it. Only the Pro holding a job can complete it, and a job someone
 else holds offers no action at all — both rules live in the store, not in the button.
 
-## The libraries, and why each one
-
-| Choice | Why this one |
-| --- | --- |
-| **Expo SDK 57** + **Expo Router** | Typed, file-based routes mean the route tree is the directory listing, and a `router.push` to a route that does not exist is a type error. Managed workflow, so there is one native build and nobody edits Xcode. |
-| **TypeScript**, strict | The domain is three statuses and two Roles; a union type is the cheapest place to keep them honest. |
-| **NativeWind** (Tailwind 3.4) | The design is spacing, type scale and a few tokens. Classes keep that in the markup instead of in a parallel stylesheet, and no component library means no fight with one. |
-| **TanStack Query v5** | Every request and its cache, with `select` as the seam the overlay plugs into. Paging, refetching and error states are the library's job, not the screen's. |
-| **Zustand** + `persist` | Session, the local job store and the form draft. Small, synchronous, and `persist` over AsyncStorage is the whole of "the Role survives a restart". |
-| **React Hook Form** + **Zod** | One schema is the validator, the resolver and the type, so the message under the field and the type of the value cannot drift. A second Zod schema parses every API response, which turns a third-party shape change into an error state rather than a crash. |
-| **DummyJSON** | A real public API with real data and no backend to write — and, by not persisting writes, the reason the overlay exists at all. |
-| **Jest + React Native Testing Library** | The fast seam: stores, hooks, mapping, overlay, schemas and screens, test-first. |
-| **Detox** | The slow seam: one spec per feature on a real simulator, against a deterministic fixture server. `docs/adr/0001` is why there are two seams and what each is for. |
-| **Turborepo + pnpm workspaces** | Seven packages, one install, and caching that was wrong until `turbo.json` named `packages/*/src` as an input — `DECISIONS.md` has that one. |
-
-Versions are the SDK's, not npm's latest: **everything Expo manages is installed with `npx expo
-install`**. That rule earned its keep on the first commit — React Native is `0.86.3` and React
-`19.2.3` where `PRD.md` said 0.87 and 19.3, AsyncStorage is `2.2.0` where it said `^3.1`, Tailwind is
-pinned to 3.4 because NativeWind 4 does not support Tailwind 4, and ESLint is pinned to 9 because
-`eslint-plugin-react` crashes on 10.
-
 ## The fixture server
 
 With `EXPO_PUBLIC_API=fixtures`, an in-memory server shaped exactly like `fetch` answers all six
@@ -134,8 +144,8 @@ pnpm --filter @repairs/both e2e:metro          # optional, in its own terminal
 pnpm e2e:test
 ```
 
-The Metro one is the only command here that has no root alias, on purpose: it is a persistent task
-that wants its own terminal, and `turbo run` is not what should own it.
+The Metro one is the only command here with no root alias, on purpose: it is a persistent task that
+wants its own terminal, and `turbo run` is not what should own it.
 
 Detox runs against the `iPhone 16-Detox` simulator in Debug, which loads its JS from Metro.
 `pnpm e2e:test` starts a Metro if none is serving and kills only one it started, so an `e2e:metro`
@@ -289,7 +299,7 @@ In the order it would be worth doing:
 
 `PRD.md` is the spec, and the code guidelines at the top of it are the ones this repo is written to.
 `GLOSSARY.md` fixes the vocabulary — every name in the code comes from there. `docs/adr/` has four
-ADRs for the decisions with consequences that outlive a ticket. `PROMPTS.md` is every prompt that
-built this, in order. `DECISIONS.md` has sixty-three entries, one for every place the PRD was left open
-or turned out to be wrong; where it and the PRD disagree, it is the one that holds, so read it before
-working rather than only when writing to it.
+ADRs for the decisions with consequences that outlive a ticket, each one marked with its status.
+`PROMPTS.md` is every prompt that built this, in order. `DECISIONS.md` has seventy entries, one for
+every place the PRD was left open or turned out to be wrong; where it and the PRD disagree, it is the
+one that holds, so read it before working rather than only when writing to it.
