@@ -613,7 +613,13 @@ distinction to whoever remembers it was not acceptable for a flag that is now on
 script `touch`es `ios/build/.detox-installed` after a successful install and drops `--reuse` whenever the
 built binary is newer than the stamp. `E2E_FRESH=1` forces one by hand. The stamp is only written when
 Detox **passed**, so a failed run reinstalls next time rather than trusting an install that may not have
-finished. Verified by running `pnpm e2e:build` and confirming the next run reinstalled.
+finished.
+
+Verified by running `pnpm e2e:build` and confirming the next run reinstalled — and one thing turned up
+there worth knowing: `expo prebuild` **clears `ios/`**, which takes `ios/build` and so the stamp with it.
+So after a full `pnpm e2e:build` the reinstall comes from the stamp being *absent* rather than from the
+binary being newer. The `-nt` comparison is what covers a bare `detox build`, and it was checked
+separately by touching the binary. Both branches print and both reinstall.
 
 **Reuse and `EXPO_PUBLIC_API` do not mix, so the script refuses rather than guesses.** `EXPO_PUBLIC_*` is
 inlined at bundle time, so a Metro already serving is serving the value it was *started* with. A run

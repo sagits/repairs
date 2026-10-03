@@ -111,7 +111,9 @@ fi
 # `--reuse` keeps whatever is already installed, which must not survive a native rebuild: the binary
 # carries compiled native code, so a stale install presents as a missing JS export rather than as a
 # build problem — the note at the top of `.detoxrc.js` is about exactly this. A `.app` newer than the
-# stamp means `pnpm e2e:build` has run since the last install, so this run installs and re-stamps.
+# stamp means a build has run since the last install, so this run installs and re-stamps. A *missing*
+# stamp counts the same, and that is the usual case after `pnpm e2e:build`, because `expo prebuild`
+# clears `ios/` and takes `ios/build` with it.
 #
 # `reuse` is one word or the empty string rather than an array, because `/bin/bash` here is 3.2, where
 # expanding an *empty* array under `set -u` is an unbound-variable error — which would have aborted
