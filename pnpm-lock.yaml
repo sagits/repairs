@@ -124,6 +124,12 @@ importers:
       '@repairs/features':
         specifier: workspace:*
         version: link:../../packages/features
+      '@repairs/stores':
+        specifier: workspace:*
+        version: link:../../packages/stores
+      '@repairs/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@repairs/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -169,6 +175,9 @@ importers:
       react-native-worklets:
         specifier: 0.10.1
         version: 0.10.1(@babel/core@7.29.7(supports-color@8.1.1))(react-native@0.86.3(@react-native/jest-preset@0.86.3(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@types/react@19.2.18)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1)
+      zustand:
+        specifier: ^5.0.15
+        version: 5.0.15(@types/react@19.2.18)(react@19.2.3)
     devDependencies:
       '@react-native/jest-preset':
         specifier: ^0.86.3
@@ -225,9 +234,23 @@ importers:
 
   packages/features:
     dependencies:
+      '@repairs/stores':
+        specifier: workspace:*
+        version: link:../stores
+      '@repairs/types':
+        specifier: workspace:*
+        version: link:../types
       '@repairs/ui':
         specifier: workspace:*
         version: link:../ui
+
+  packages/stores:
+    dependencies:
+      '@repairs/types':
+        specifier: workspace:*
+        version: link:../types
+
+  packages/types: {}
 
   packages/ui: {}
 
@@ -5409,6 +5432,24 @@ packages:
 
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
+  zustand@5.0.15:
+    resolution: {integrity: sha512-MpSEjRiBkA9crSYeOUH32rJC7SVqAbm0Fqcqge/bUi2PPoLcBWKOsG+C8mevmpr8TwXHBVkChbbJiyvkE+i/3A==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
 
 snapshots:
 
@@ -11673,3 +11714,8 @@ snapshots:
       zod: 3.25.76
 
   zod@3.25.76: {}
+
+  zustand@5.0.15(@types/react@19.2.18)(react@19.2.3):
+    optionalDependencies:
+      '@types/react': 19.2.18
+      react: 19.2.3

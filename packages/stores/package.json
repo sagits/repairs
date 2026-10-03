@@ -1,0 +1,17 @@
+{
+  "name": "@repairs/stores",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@repairs/types": "workspace:*"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": "*",
+    "react": "*",
+    "zustand": "*"
+  }
+}

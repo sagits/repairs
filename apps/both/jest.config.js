@@ -17,5 +17,6 @@ module.exports = {
   roots: ['<rootDir>/app', path.resolve(__dirname, '../../packages')],
   testPathIgnorePatterns: ['/node_modules/', '/e2e/', '/dist/'],
   modulePaths: [path.resolve(__dirname, 'node_modules'), path.resolve(__dirname, '../../node_modules')],
+  setupFiles: ['<rootDir>/jest.setup.js'],
   testTimeout: 30_000,
 };

@@ -11,6 +11,7 @@ const nodeConfigOverride = {
     'eslint.config.js',
     '**/.detoxrc.js',
     '**/jest.config.js',
+    '**/jest.setup.js',
     '**/tailwind.config.js',
     'packages/config/*.js',
     'packages/ui/*.js',
@@ -19,6 +20,7 @@ const nodeConfigOverride = {
     sourceType: 'commonjs',
     globals: {
       __dirname: 'readonly',
+      jest: 'readonly',
       module: 'writable',
       process: 'readonly',
       require: 'readonly',
