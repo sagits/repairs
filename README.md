@@ -26,6 +26,18 @@
 - **Git worktree** - I used git worktrees to be able to work on multiple PRs at the same time
 - **PRD.md** - Product requirement document that I created with all the technical decisions and the architecture that I want to use on this project (including following the Turno design system)
 
+## Features
+
+| Feature | What it does |
+| --- | --- |
+| Login / role selection | Login screen with a switch for user type |
+| My Jobs (Client) | Show the client jobs. Pull to refresh |
+| Available (Pro) | Open jobs from every client and a claim button|
+| My Jobs (Pro) | Jobs this Pro claimed|
+| Job detail | One screen for both roles. Client can cancel while the job is still open, Pro can claim or mark as done |
+| New job | Title and description on React Hook Form + Zod |
+| Settings | Name, email, current role, switch role, log out, and clear the local job data |
+
 ## Workflow
 
 This is how I implemented the stack, features, and screens. I used AI-assisted development, but I was in front of the computer giving prompts, validating, testing, and requesting changes during the entire 10 hours of development:
@@ -112,22 +124,14 @@ Two tickets are open and deliberately unbuilt. Each one has a comment on the iss
   `apps/client`, `apps/pro` and `scripts/check-app-parity.mjs` do not exist. `docs/adr/0003` has the
   reasoning, and it carries a deferred marker pointing at the issue.
 
-## What more time would buy
+## what I had do with more time,
 
 In the order it would be worth doing:
 
 1. **A backend.** Status and assignee become the server's, `available` becomes a query parameter, and
    the overlay is deleted rather than ported. Everything else on this list gets smaller.
-2. **The write path against a real API** — the one gap in the live pass, and the one that needs a
-   server that persists before it means anything.
-3. **The two role-locked apps and the parity script** (#13), the architecture claim
-   `docs/adr/0003` makes and nothing here checks.
-4. **The web target** (#14): a static export, the tab bar becoming a sidebar at `md:`, a deploy.
-5. **A design pass** — tab icons, which `@expo/vector-icons` would need installing for, the
-   empty-state glyphs, and the visual layer checked against reference screenshots that exist.
-6. **A second Pro**, which is what would let the "somebody else holds this job" rule be asserted on a
-   device instead of only in Jest.
-7. **Android**, which the stack supports and nothing here verifies.
+2. **The two role-locked apps and the parity script** (issue #13, not done), my initial idea was to create 3 apps: one for both users, one for Client user, and one for Pro user. They could share the same logic and components because of the monorepo structure.
+4. **The web target** (issue #14, not done): I would like to send this to vercel (as a web project using react native web, sharing same layout and features as native) so its easier to test
 
 ## Where the design lives
 
