@@ -60,6 +60,32 @@ it('keeps the description a Client typed, which no Server job can have', () => {
   expect(job.description).toBe('Reads zero each morning.');
 });
 
+/**
+ * **`NewJobSchema` is parsed in the store as well as in the form, and this is the half that carries the
+ * weight.** The form is a UI affordance a second caller can skip entirely; the store is the boundary
+ * nothing gets past. The message asserted is the schema's own, so what a caller is told is word for word
+ * what the field under the input says.
+ */
+it("rejects a title the schema would not accept, in the schema's own words", () => {
+  expect(() => store().createJob({ title: 'ab' }, CLIENT_ID)).toThrow('Give the job a title');
+  expect(store().created).toEqual([]);
+});
+
+/**
+ * Parsing in the store is also what makes the schema's `trim()` reach the stored Job rather than only the
+ * validation. A description of nothing but spaces is a missing description by the same rule — absent
+ * rather than empty, because an empty string renders an empty line on a screen.
+ */
+it('stores what the schema returns, so the title is trimmed and a blank description is absent', () => {
+  const job = store().createJob(
+    { title: '  Gutter overflows at the corner  ', description: '   ' },
+    CLIENT_ID,
+  );
+
+  expect(job.title).toBe('Gutter overflows at the corner');
+  expect(job).not.toHaveProperty('description');
+});
+
 it('puts the newest Local job first, and numbers ids without ever reusing one', () => {
   store().createJob({ title: 'First job posted' }, CLIENT_ID);
   store().createJob({ title: 'Second job posted' }, CLIENT_ID);

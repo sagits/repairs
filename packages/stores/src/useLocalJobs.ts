@@ -20,7 +20,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { ClaimRecord, Job, LocalJobs, NewJobInput } from '@repairs/types';
+import {
+  NewJobSchema,
+  type ClaimRecord,
+  type Job,
+  type LocalJobs,
+  type NewJobInput,
+} from '@repairs/types';
 import { createHydrationHook } from './hydration';
 
 export const LOCAL_JOBS_STORAGE_KEY = 'repairs-local-jobs';
@@ -35,7 +41,10 @@ const LOCAL_ID_PREFIX = 'local-';
 export const isLocal = (jobId: string) => jobId.startsWith(LOCAL_ID_PREFIX);
 
 type LocalJobsState = LocalJobs & {
-  /** Posts a Job that exists only on this device, and hands it back so the caller can show it. */
+  /**
+   * Posts a Job that exists only on this device, and hands it back so the caller can show it. The
+   * input is parsed against `NewJobSchema` first, so this is a validation boundary and not just a write.
+   */
   createJob: (input: NewJobInput, clientId: number) => Job;
   /** One Pro takes one open Job. Rejected if anyone already holds it or it has left `open`. */
   claimJob: (job: Job, proId: string) => void;
@@ -70,7 +79,16 @@ export const useLocalJobs = create<LocalJobsState>()(
     (set, get) => ({
       ...NOTHING_LOCAL,
 
-      createJob: ({ title, description }, clientId) => {
+      createJob: (input, clientId) => {
+        // The schema is parsed **here**, not only in the form. The form is a UI affordance that a second
+        // caller could skip; this is the boundary, and parsing at it is also what puts the schema's own
+        // `trim()` on the stored Job rather than only on the validation. The first issue's message is
+        // what gets thrown because that message is screen-ready by design — it is the exact copy the
+        // field under the input shows — where a `ZodError`'s own message is a JSON blob nobody reads.
+        const parsed = NewJobSchema.safeParse(input);
+        if (!parsed.success) throw new Error(parsed.error.issues[0]?.message);
+
+        const { title, description } = parsed.data;
         const { created } = get();
         // `created` only ever grows — a cancellation is recorded in `deleted` and the row stays, which
         // is what the overlay filters on — so its length is a safe source of the next id. Pruning it
