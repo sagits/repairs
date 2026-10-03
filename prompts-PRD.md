@@ -1,6 +1,6 @@
 # Prompts — writing the PRD
 
-The prompts used to produce `PRD.md`, in order, verbatim.
+The prompts used to produce `PRD.md`, in order, verbatim. It was run from an agent inside this other project where I created a copy of Turno Hosts app (because it already had most the architecture, libraries, colors, and design system I needed for this task, so I would like to reuse it): https://github.com/sagits/sweep-public
 
 ---
 
