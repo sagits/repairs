@@ -700,3 +700,85 @@ against a cold run, not only a warm one.
 reports as Detox's "element not visible" rather than as a bare Jest timeout that says nothing about what
 was on screen. Raise them together or not at all. The one case that will fail first is a genuinely cold
 Metro cache, which only happens when someone clears it — `VISIBLE_WITHIN` is the number to raise then.
+
+## The new-job form keeps `FormField` local and drops the debounce, both against `PRD.md`
+
+`PRD.md:715` puts "one `<FormField>` in `packages/ui`" so that "the error treatment is identical
+everywhere". Everywhere is one place. This is the only form in the app and the only one any ticket on the
+board adds — the login picker is two buttons, Settings is three, and every mutation left is a button with a
+confirm. A field component in the design system would be `@repairs/ui`'s first dependency on React Hook
+Form, acquired for a single consumer, and it would have to be imported back across the package boundary to
+be used. So it is a local component inside `NewJobScreen.tsx`. **If a second form ever arrives, that is the
+move:** lift it to `packages/ui`, add `react-hook-form` to that package's peers, and the call sites do not
+change.
+
+`PRD.md:386` asks for "a debounced subscription" writing values back to the draft. There is nothing to
+debounce. The subscription is `subscribe({ formState: { values: true } })` rather than `watch(cb)`, which
+notifies **without re-rendering** the form, and nothing anywhere reads the draft through the hook — the form
+reads it once with `getState()` on mount, by the PRD's own instruction. So a keystroke costs one object
+assignment with no render behind it, and a debounce would be a timer plus its cleanup guarding nothing. If
+the draft ever becomes persisted, the write stops being free and that is when the debounce earns its keep.
+
+## The create is one `mutationFn`, and its rollback restores the store rather than removing the row
+
+`PRD.md:494` sketches every mutation as `onMutate` applying the change, then the request, then `onError`
+restoring. **`onMutate` cannot be used for the create.** It receives the mutation's *input*, where the
+request needs the Job `createJob` minted from that input — the `local-N` id, the `createdAt` — and react-query
+hands `onMutate`'s return value to `onError` and `onSuccess`, never to `mutationFn`. Splitting it would mean
+either minting the Job twice or stashing it in a ref between two callbacks. One `mutationFn` that creates,
+sends and rolls back keeps the Job in scope for all three, which is also what lets the rollback name what it
+is rolling back. The optimistic property the PRD is after is unaffected: the local write still happens before
+the request, so the list is correct before anything is sent.
+
+**The rollback restores the three fields wholesale instead of removing the one row,** and that is not
+laziness. `created.length` is where the next `local-N` comes from — the entry above about `created` never
+being pruned is the same fact from the other side — so splicing the failed row out would hand `local-1` to a
+different Job while a retry of the failed one is still on screen. Restoring the snapshot puts the counter
+back exactly where it was, so pressing Post again after a failure gets the id the failed attempt had.
+
+And `createTodo` returns `void` rather than a parsed `Todo`. The PRD says the response id is discarded; this
+goes one step further and does not parse the response at all, because a schema protects a value something
+reads and nothing reads this one. `POST /todos/add` answers `id: 255` every time and keeps no row.
+
+## A settled react-query mutation holds a five-minute timer that `queryClient.clear()` does not clear
+
+`NewJobScreen.test.tsx` is the suite's first mutation test, and it sat for five minutes after a green run
+before exiting. The cause is not the app's: `MutationCache.clear()` empties its map and notifies observers,
+where `QueryCache.clear()` destroys each query's garbage-collection timer — so `queryClient.clear()` in an
+`afterEach` leaves a settled mutation's `gcTime` timer, five minutes by default, holding the Node process
+open. `--detectOpenHandles` does not report it.
+
+The fix is `mutations: { gcTime: 0 }` on the **test** client, which drops the mutation the moment it settles.
+The app keeps the default, where a five-minute window on a mutation nothing is reading costs nothing.
+**Every mutation ticket left — `#9`, `#11`, `#12` — needs that line in its test client**, and the symptom is
+a green suite that will not exit rather than a failure, which is why it is written down here.
+
+## Installing a dependency behind a warm Metro needs watchman reset, not just a restart
+
+The first run of `new-job.e2e.ts` failed every test on the app never reaching the Role picker, with Detox
+reporting it busy for thirty seconds. The app was sitting on a bundling error, and the error was not about
+`react-hook-form` at all: Metro claimed `node_modules/zod/index.cjs` did not exist, for a file that had been
+on disk since September. `pnpm add` had churned the store under a Metro that was already serving, and
+watchman — which had been warning "Recrawled this watch 5 times … MustScanSubDirs UserDropped" for several
+tickets — had dropped the updates, so Metro's file map was stale about a package nothing in this ticket
+touched.
+
+`watchman watch-del` and `watch-project` on the repo, then restarting the long-lived Metro with `--clear`,
+fixed it, and the same spec went 6/6 on the next run. So: **`pnpm add` or `npx expo install` while
+`e2e:metro` is up means resetting watchman and restarting it**, and a resolution error naming an unrelated
+package is the signature rather than a reason to doubt the install. Checking the bundle directly —
+`curl localhost:8081/apps/both/node_modules/expo-router/entry.bundle?platform=ios&dev=true` — is what turned a
+mute "app is busy" into a one-line diagnosis, and it is the first thing to do when a launch hangs.
+
+## A failed create is driven in Jest and not on the device, because the fixtures bridge rewrites URLs
+
+`apps/both/fixtures.ts` reaches the fixture server's seeded failure by rewriting the Client's list request on
+its way in, which is a URL. A create's poisoned `userId` is in the **body**, and the bridge does not touch
+bodies — so `new-job.e2e.ts` cannot reach the failed-post card the way `client-jobs.e2e.ts` reaches the
+failed-list card. It is not faked either: `NewJobScreen.test.tsx` signs in as the poisoned id and drives the
+real request, asserting the card above the form, the rollback of the local write, and the draft surviving so
+the press can simply be repeated.
+
+Recorded because `#11` — "A Pro claims an open job" — and `#12` — "A Pro completes a job they hold" — will
+want a failed mutation on a device, and the work is to extend `redirect` in `fixtures.ts` to rewrite a
+create's body as well as the URL. Two lines, in the one place that already knows about `fixtureUser`.
