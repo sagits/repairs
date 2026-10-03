@@ -173,8 +173,9 @@ fixture server.
 
 ### Requirement coverage
 
-Every numbered requirement in the brief, and where it is satisfied. Three rows landed differently
-than `PRD.md:898-909` planned; those are marked, and the reasons are in `DECISIONS.md`.
+Every numbered requirement in the brief, and where it is satisfied — checked row by row against the
+code rather than copied from `PRD.md:898-909`. Four of the twelve carry a qualification that version
+does not, marked in bold; the reasons for all four are in `DECISIONS.md`.
 
 | # | Requirement | Where |
 |---|---|---|
@@ -188,7 +189,7 @@ than `PRD.md:898-909` planned; those are marked, and the reasons are in `DECISIO
 | 8 | Pro claims an open job; it becomes claimed and assigned to them | `useClaimJob` → `claimJob` in `useLocalJobs`, then `PUT /todos/{id}`; the claim is stored as a snapshot |
 | 9 | Pro marks a claimed job done, only their own | `useCompleteJob` → `completeJob`, guarded in the store, written onto the same claim record |
 | 10 | A Pro cannot claim an already-claimed or done job | Guarded in the store, and the action is absent in the UI. **Not covered by both seams**: there is exactly one Pro, so "a job another Pro holds" exists only in Jest; the device asserts the done half of the same branch |
-| 11 | The states a real screen has, not just the happy path | `PRD.md`'s states table, with two documented exceptions below |
+| 11 | The states a real screen has, not just the happy path | `PRD.md`'s states table, with two exceptions: the **muted tint on an in-flight row is verified by eye only**, and the Pro's claimed-jobs list has no skeleton, pull-to-refresh or error state because it runs no query at all — a local read has none of those states to be in |
 | 12 | After an action, the UI reflects the new state without a restart | Structural — a mutation writes `useLocalJobs`, `select` re-runs, every mounted list re-renders. There is no refresh button anywhere |
 
 ### What was done beyond the floor
