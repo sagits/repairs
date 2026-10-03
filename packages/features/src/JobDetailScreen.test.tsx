@@ -72,7 +72,7 @@ const renderScreen = () => render(<JobDetailScreen />, { wrapper });
  */
 const WHAT_FAILED: Record<string, string> = {
   DELETE: 'The job could not be cancelled upstream',
-  PUT: 'The job could not be claimed upstream',
+  PUT: 'The job could not be written upstream',
 };
 
 const failEvery = (method: string) => {
@@ -278,7 +278,7 @@ it('rolls the claim back to open with the failure above the card', async () => {
   await userEvent.press(screen.getByTestId('claim-job'));
 
   await waitFor(() => expect(screen.getByTestId('claim-job-error')).toBeOnTheScreen());
-  expect(screen.getByText('The job could not be claimed upstream')).toBeOnTheScreen();
+  expect(screen.getByText(WHAT_FAILED.PUT as string)).toBeOnTheScreen();
   expect(screen.getByText('Open')).toBeOnTheScreen();
   expect(screen.getByTestId('claim-job')).toBeOnTheScreen();
   expect(useLocalJobs.getState().claims).toEqual({});
@@ -380,4 +380,83 @@ it("shows the error card in the server's own words when the Job fails to load, w
   ).toBeOnTheScreen();
   expect(screen.getByTestId('retry-job')).toBeOnTheScreen();
   expect(screen.queryByTestId('job-not-found')).not.toBeOnTheScreen();
+});
+
+/**
+ * Mark as done, from the detail. A Pro who holds the Job gets it; the Client who posted it never does, which
+ * the test below the next one covers from the other side.
+ */
+it('marks a Job the Pro holds as done, and the Job reads back as done on the same screen', async () => {
+  signInAs('pro');
+  useLocalJobs.setState({ created: [], claims: { [AN_OPEN_JOB.id]: aClaim }, deleted: [] });
+  await renderScreen();
+  await waitFor(() => expect(screen.getByTestId('complete-job')).toBeOnTheScreen());
+
+  await userEvent.press(screen.getByTestId('complete-job'));
+
+  // The pill turns on the optimistic write and the button goes once the request has settled — `|| completing`
+  // holds it there, disabled and spinning, in between. So the second of these is a `waitFor` and not a
+  // straight assertion, and the order of the two is the pending state existing at all.
+  await waitFor(() => expect(screen.getByText('Done')).toBeOnTheScreen());
+  await waitFor(() => expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen());
+  // The hold is ended, not erased — the record still names the Pro and the day they took it.
+  expect(useLocalJobs.getState().claims[AN_OPEN_JOB.id]).toMatchObject({
+    proId: PEOPLE.pro.id,
+    claimedAt: aClaim.claimedAt,
+  });
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+});
+
+/**
+ * The other half of requirement 10 on this screen: a Job **another** Pro holds offers nothing, and a Job
+ * already done offers nothing either. Both are asserted here rather than on the device, and for one of them
+ * there is no choice — there is exactly one Pro in this app, so a second Pro's claim can only be written by a
+ * test. `pro-mine.e2e.ts` asserts the done half on a device, which is the same branch.
+ */
+it("offers a Pro nothing on a Job another Pro holds, and nothing on one already done", async () => {
+  signInAs('pro');
+  useLocalJobs.setState({
+    created: [],
+    claims: { [AN_OPEN_JOB.id]: { ...aClaim, proId: 'pro-someone-else' } },
+    deleted: [],
+  });
+
+  await renderScreen();
+
+  await waitFor(() => expect(screen.getByText('Claimed')).toBeOnTheScreen());
+  expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen();
+  expect(screen.queryByTestId('claim-job')).not.toBeOnTheScreen();
+
+  openJob(A_DONE_JOB.id);
+  await renderScreen();
+
+  await waitFor(() => expect(screen.getByText('Done')).toBeOnTheScreen());
+  expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen();
+  expect(screen.queryByTestId('claim-job')).not.toBeOnTheScreen();
+});
+
+/** And a Client never has it, whoever holds the Job — the Client's verb is Cancel and only while it is open. */
+it('offers a Client no Mark as done on a Job a Pro holds', async () => {
+  useLocalJobs.setState({ created: [], claims: { [AN_OPEN_JOB.id]: aClaim }, deleted: [] });
+
+  await renderScreen();
+
+  await waitFor(() => expect(screen.getByText('Claimed')).toBeOnTheScreen());
+  expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen();
+});
+
+/** The rollback goes back to claimed, not to open: the Job is still held, it is just not finished. */
+it('rolls a failed completion back to claimed with the failure above the card', async () => {
+  signInAs('pro');
+  useLocalJobs.setState({ created: [], claims: { [AN_OPEN_JOB.id]: aClaim }, deleted: [] });
+  failEvery('PUT');
+  await renderScreen();
+  await waitFor(() => expect(screen.getByTestId('complete-job')).toBeOnTheScreen());
+
+  await userEvent.press(screen.getByTestId('complete-job'));
+
+  await waitFor(() => expect(screen.getByTestId('complete-job-error')).toBeOnTheScreen());
+  expect(screen.getByText('Claimed')).toBeOnTheScreen();
+  expect(screen.getByTestId('complete-job')).toBeOnTheScreen();
+  expect(useLocalJobs.getState().claims[AN_OPEN_JOB.id]?.completedAt).toBeUndefined();
 });

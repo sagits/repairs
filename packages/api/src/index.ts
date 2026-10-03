@@ -24,6 +24,7 @@ export {
   useCancelJob,
   useClaimJob,
   useClientJobs,
+  useCompleteJob,
   useCreateJob,
   useJob,
 } from './useJobs';

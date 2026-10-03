@@ -32,7 +32,14 @@ import { CLIENT_USER_ID, FIXTURE_FAILURE_ID } from '@repairs/testing';
 import type { Job } from '@repairs/types';
 import { ApiError, API_BASE_URL } from './client';
 import { createQueryClient, jobKeys } from './queryClient';
-import { useAvailableJobs, useCancelJob, useClaimJob, useClientJobs, useJob } from './useJobs';
+import {
+  useAvailableJobs,
+  useCancelJob,
+  useClaimJob,
+  useClientJobs,
+  useCompleteJob,
+  useJob,
+} from './useJobs';
 
 const PRO_ID = 'pro-1';
 
@@ -519,4 +526,109 @@ it('drops the claimed row out of available jobs, and keeps it out through the re
 
   await waitFor(() => expect(queryClient.isFetching()).toBe(0));
   expect(ids(list.result.current.data)).not.toContain(open.id);
+});
+
+/**
+ * `useCompleteJob` — the Pro's second verb, and the one that proves the claim record is the right shape. A
+ * completion is written **onto** the record rather than replacing or removing it, so `claims` goes on covering
+ * every Job that has left `open`, claimed and done alike, and `done` is read off `completedAt` rather than
+ * stored a second time. `ADR 0002` says that in words; these tests are it in behaviour.
+ *
+ * The body sent is `toTodoBody` with the status forced to `done`, which is the one field of ours the API has
+ * anywhere to put — the same function the create uses, for the reason recorded on it.
+ */
+const aJobHeldBy = (proId: string, id: string): Job => {
+  const open = anOpenJobOf(id);
+  useLocalJobs.getState().claimJob(open, proId);
+  return { ...open, status: 'claimed', proId };
+};
+
+it('writes the completion onto the claim record rather than replacing it, then tells the server', async () => {
+  signedInAsThePro();
+  const held = aJobHeldBy(PRO_ID, A_CLIENT_JOB.id);
+  calls.length = 0;
+  const { result } = await renderHook(() => useCompleteJob(), { wrapper });
+
+  await act(async () => {
+    await result.current.mutateAsync(held);
+  });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  const claim = useLocalJobs.getState().claims[A_CLIENT_JOB.id];
+  expect(claim?.completedAt).toBeDefined();
+  // The hold is ended, not erased: the Pro and the day they took it are still on the record.
+  expect(claim?.proId).toBe(PRO_ID);
+  expect(claim?.claimedAt).toBeDefined();
+  expect(calls).toEqual([{ method: 'PUT', url: `${API_BASE_URL}/todos/${A_CLIENT_JOB.id}` }]);
+});
+
+it('completes a Local job with no request at all, because there is nothing upstream to tell', async () => {
+  signedInAsThePro();
+  const local = useLocalJobs.getState().createJob({ title: 'Garage door will not lift' }, CLIENT_USER_ID);
+  useLocalJobs.getState().claimJob(local, PRO_ID);
+  const { result } = await renderHook(() => useCompleteJob(), { wrapper });
+  const fetchesSoFar = fetchCount;
+
+  await act(async () => {
+    await result.current.mutateAsync({ ...local, status: 'claimed', proId: PRO_ID });
+  });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(useLocalJobs.getState().claims[local.id]?.completedAt).toBeDefined();
+  expect(fetchCount).toBe(fetchesSoFar);
+});
+
+/** The rollback goes back to **claimed**, not to open: the Job is still held, it is just not finished. */
+it('rolls back to claimed when the completion does not reach the server', async () => {
+  signedInAsThePro();
+  const held = aJobHeldBy(PRO_ID, String(FIXTURE_FAILURE_ID));
+  const { result } = await renderHook(() => useCompleteJob(), { wrapper });
+
+  await act(async () => {
+    await expect(result.current.mutateAsync(held)).rejects.toThrow(
+      `Fixture failure seeded for id ${FIXTURE_FAILURE_ID}`,
+    );
+  });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  const claim = useLocalJobs.getState().claims[String(FIXTURE_FAILURE_ID)];
+  expect(claim?.completedAt).toBeUndefined();
+  expect(claim?.proId).toBe(PRO_ID);
+});
+
+/**
+ * Requirement 9's "only their own", at the seam that enforces it. The UI offers nothing on a Job somebody else
+ * holds, and the rule is the store's: the completion is refused with the sentence a screen can show and
+ * **nothing is sent**, whichever screen or race arrives at it.
+ */
+it("refuses to complete a Job this Pro does not hold, and sends nothing", async () => {
+  signedInAsThePro();
+  const somebodyElses = aJobHeldBy('pro-someone-else', A_CLIENT_JOB.id);
+  const { result } = await renderHook(() => useCompleteJob(), { wrapper });
+  const fetchesSoFar = fetchCount;
+
+  await act(async () => {
+    await expect(result.current.mutateAsync(somebodyElses)).rejects.toThrow(
+      'Only the Pro holding a job can complete it',
+    );
+  });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(useLocalJobs.getState().claims[A_CLIENT_JOB.id]?.completedAt).toBeUndefined();
+  expect(fetchCount).toBe(fetchesSoFar);
+});
+
+it("refuses to complete a Job that is already done, in the store's own words", async () => {
+  signedInAsThePro();
+  const held = aJobHeldBy(PRO_ID, A_CLIENT_JOB.id);
+  useLocalJobs.getState().completeJob(held.id, PRO_ID);
+  const { result } = await renderHook(() => useCompleteJob(), { wrapper });
+  const fetchesSoFar = fetchCount;
+
+  await act(async () => {
+    await expect(result.current.mutateAsync(held)).rejects.toThrow('That job is already done');
+  });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(fetchCount).toBe(fetchesSoFar);
 });

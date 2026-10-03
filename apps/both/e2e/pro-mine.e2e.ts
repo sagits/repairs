@@ -1,6 +1,7 @@
 /**
  * Claimed jobs on the device: a Job claimed from Available turning up here with no refresh, the detail it
- * opens onto, and the one assertion this screen exists for — **it is still there after a restart**.
+ * opens onto, the one assertion this screen exists for — **it is still there after a restart** — and then the
+ * completion, rolled back once and then taken, which is the only way to see the two groups.
  *
  * That restart is the whole argument for `ADR 0002`'s snapshot rather than a patch. A relaunch empties the
  * react-query cache, the Job in question is on page one of thirteen that nobody has asked for, and the API
@@ -29,11 +30,29 @@ const THE_JOB = { id: '1', title: 'Replace cracked bathroom tile' };
 /** The one Pro, by the name the session invents for them. `pro-1` on a card would say nothing. */
 const THE_PRO = 'Mike Sullivan';
 
+/** The method-naming half of the fixtures bridge. `apps/both/fixtures.ts` has the mechanism and the argument. */
+const EVERY_WRITE_FAILS = 'repairs:///?fixtureFail=PUT';
+const A_WORKING_SERVER = 'repairs:///?fixtureFail=';
+
 const waitForVisible = (testID: string) =>
   waitFor(element(by.id(testID))).toBeVisible().withTimeout(VISIBLE_WITHIN);
 
 const waitForText = (text: string) =>
   waitFor(element(by.text(text))).toBeVisible().withTimeout(VISIBLE_WITHIN);
+
+/**
+ * **A group is waited on for existence rather than for visibility, and that is not laziness.** Each group is a
+ * `View` holding a heading and its rows and drawing nothing of its own, and `toBeVisible` fails a view that
+ * draws nothing — it also fails one whose bounds are less than 75% on screen, which a group becomes the moment
+ * an error card appears above it. `DECISIONS.md` has the entry from the ticket that first lost time to this.
+ * The group's *presence* is the structural claim; the pill inside the row is the one that has to be seen.
+ */
+const waitForExists = (testID: string) =>
+  waitFor(element(by.id(testID))).toExist().withTimeout(VISIBLE_WITHIN);
+
+/** The status on one row, by the row it belongs to rather than by whichever pill Detox matched first. */
+const statusOf = (jobId: string, status: string) =>
+  element(by.text(status).withAncestor(by.id(`claimed-job-${jobId}`)));
 
 /**
  * Back to the Role picker without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
@@ -83,9 +102,7 @@ describe('pro claimed jobs', () => {
     await element(by.id('tab-mine')).tap();
 
     await waitForVisible(`claimed-job-${THE_JOB.id}`);
-    await expectElement(
-      element(by.text('Claimed').withAncestor(by.id(`claimed-job-${THE_JOB.id}`))),
-    ).toBeVisible();
+    await expectElement(statusOf(THE_JOB.id, 'Claimed')).toBeVisible();
   });
 
   /**
@@ -128,5 +145,57 @@ describe('pro claimed jobs', () => {
     await expectElement(
       element(by.text(THE_JOB.title).withAncestor(by.id(`claimed-job-${THE_JOB.id}`))),
     ).toBeVisible();
+  });
+
+  /**
+   * The rollback, before the real completion: the Job goes back to **claimed** rather than to open, because it
+   * is still held and just not finished. The card above the list says what failed in the server's own words,
+   * which `?fixtureFail=PUT` reaches through the method-naming half of the fixtures bridge.
+   */
+  it('puts a failed completion back in the claimed group, with the failure above it', async () => {
+    /**
+     * **The fixtures link lands on `/`, so it navigates away from this tab and the spec has to come back.**
+     * Every earlier use of the bridge is driven from a screen that *is* `/` — the Client's list, the Pro's
+     * available list — where Expo Router's handling of it is a no-op and nobody had to notice. Claimed jobs is
+     * `/mine`, and the first draft of this test tapped a button on a tab it was no longer on.
+     */
+    await device.openURL({ url: EVERY_WRITE_FAILS });
+    await element(by.id('tab-mine')).tap();
+
+    await element(by.id(`complete-job-${THE_JOB.id}`)).tap();
+
+    await waitForText('Could not mark this job done');
+    await expectElement(element(by.text('Fixture failure seeded for id 9001'))).toBeVisible();
+    await expectElement(statusOf(THE_JOB.id, 'Claimed')).toBeVisible();
+    await expectElement(element(by.id('done-group'))).not.toExist();
+
+    await device.openURL({ url: A_WORKING_SERVER });
+    await element(by.id('tab-mine')).tap();
+
+    await waitForExists(`complete-job-${THE_JOB.id}`);
+  });
+
+  /**
+   * The completion, and the grouping it is the only way to see: the row leaves the claimed group for the done
+   * one with nothing refreshed by hand. And then there is **nothing** on it — done is terminal, so the action
+   * is absent rather than disabled and lying, on the row and on the detail behind it.
+   *
+   * A Job *another Pro* holds cannot be reached from a device at all: there is exactly one Pro in this app, so
+   * a second Pro's claim can only be written by a test. `JobDetailScreen.test.tsx` asserts that half of the
+   * same branch, and `DECISIONS.md` records why it has to.
+   */
+  it('marks the Job done, it moves to the done group, and nothing is offered on it', async () => {
+    await element(by.id(`complete-job-${THE_JOB.id}`)).tap();
+
+    await waitForExists('done-group');
+    await expectElement(statusOf(THE_JOB.id, 'Done')).toBeVisible();
+    await expectElement(element(by.id('claimed-group'))).not.toExist();
+    await expectElement(element(by.id(`complete-job-${THE_JOB.id}`))).not.toExist();
+
+    await element(by.id(`claimed-job-${THE_JOB.id}`)).tap();
+
+    await waitForText('Done');
+    await expectElement(element(by.id('complete-job'))).not.toExist();
+    await expectElement(element(by.id('claim-job'))).not.toExist();
   });
 });

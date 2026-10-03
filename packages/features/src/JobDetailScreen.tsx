@@ -23,7 +23,7 @@
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import { useCancelJob, useClaimJob, useJob } from '@repairs/api';
+import { useCancelJob, useClaimJob, useCompleteJob, useJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
 import { colors, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job, JobStatus, User } from '@repairs/types';
@@ -281,7 +281,12 @@ export function JobDetailScreen() {
    * as the mutation, so the Claim can keep rendering — spinning — until the request has settled either way.
    */
   const claim = useClaimJob();
+  const complete = useCompleteJob();
   const claiming = claim.isPending;
+  const completing = complete.isPending;
+
+  /** Whether the Pro reading this is the one holding it, which is the only question Mark as done turns on. */
+  const holdsIt = job?.proId === user?.id;
 
   return (
     <Screen>
@@ -300,7 +305,14 @@ export function JobDetailScreen() {
               message={claim.error.message}
             />
           ) : null}
-          {job ? <JobCard job={job} user={user} muted={claiming} /> : null}
+          {complete.error ? (
+            <ActionError
+              testID="complete-job-error"
+              title="Could not mark this job done"
+              message={complete.error.message}
+            />
+          ) : null}
+          {job ? <JobCard job={job} user={user} muted={claiming || completing} /> : null}
           {job && isOwnJob && user?.role === 'client' ? (
             job.status === 'open' ? (
               <CancelJob job={job} />
@@ -311,23 +323,38 @@ export function JobDetailScreen() {
             )
           ) : null}
           {/**
-           * The Pro's side of the same branch. **Claim on an open Job, and nothing at all on one somebody
-           * else holds** — not a disabled button and not a line of explanation, because a Pro reading a Job
-           * another Pro took has no relationship to it and an empty space is the honest account of that. The
-           * store refuses the claim either way; this is the screen agreeing with it rather than enforcing it.
+           * The Pro's side of the same branch: **Claim on an open Job, Mark as done on one they hold, and
+           * nothing at all on one somebody else holds or one already done.** Not a disabled button and not a
+           * line of explanation — a Pro reading a Job another Pro took has no relationship to it, and an empty
+           * space is the honest account of that. The store refuses both verbs in those cases anyway; this is
+           * the screen agreeing with it rather than the thing enforcing it.
            *
-           * `|| claiming` is what keeps the button on screen through its own request. Without it the status
-           * flips to claimed on the optimistic write and the button vanishes mid-flight, so the spinner that
-           * the states table asks for would never be seen and a failure would have nothing to roll back to.
+           * `|| claiming` and `|| completing` are what keep each button on screen through its own request.
+           * Without them the status flips on the optimistic write and the button vanishes mid-flight, so the
+           * spinner the states table asks for would never be seen and a failure would have nothing to roll
+           * back to.
            */}
-          {job && user?.role === 'pro' && (job.status === 'open' || claiming) ? (
-            <ActionButton
-              testID="claim-job"
-              label="Claim"
-              pending={claiming}
-              onPress={() => claim.mutate(job)}
-            />
-          ) : null}
+          {job && user?.role === 'pro'
+            ? job.status === 'open' || claiming
+              ? (
+                  <ActionButton
+                    testID="claim-job"
+                    label="Claim"
+                    pending={claiming}
+                    onPress={() => claim.mutate(job)}
+                  />
+                )
+              : (job.status === 'claimed' && holdsIt) || completing
+                ? (
+                    <ActionButton
+                      testID="complete-job"
+                      label="Mark as done"
+                      pending={completing}
+                      onPress={() => complete.mutate(job)}
+                    />
+                  )
+                : null
+            : null}
         </ScrollView>
       )}
     </Screen>

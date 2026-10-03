@@ -1,8 +1,15 @@
 /**
- * The Job hooks: the two queries, and the one mutation. Each query is an ordinary-looking query whose
- * `select` quietly does the work of
- * `ADR 0002`: the cache holds the server's rows, the Local job store holds everything the server
- * cannot, and `select` is the only place the two meet.
+ * The Job hooks: three queries, and the four verbs. Each query is an ordinary-looking query whose `select`
+ * quietly does the work of `ADR 0002` — the cache holds the server's rows, the Local job store holds
+ * everything the server cannot, and `select` is the only place the two meet.
+ *
+ * **The four mutations are deliberately one shape, written out four times rather than abstracted.** Each is a
+ * store write, then the request, then the three fields restored wholesale if the request failed; each skips
+ * the network entirely for a `local-N` id; each surfaces the store's guard as its own `error` with nothing
+ * sent. What differs between them is which verb, which guard and which endpoint, which is most of what each
+ * one is — a shared helper would take the three of those as parameters and leave four call sites that are
+ * harder to read than the bodies they replaced. The comment on `useCreateJob` has the long version of the
+ * reasoning they share, and the three below it point at it rather than repeating it.
  *
  * **Two rules hold this together, and both cost a re-render storm if broken.**
  *
@@ -324,6 +331,55 @@ export function useClaimJob() {
 
       try {
         await updateTodo(job.id, toTodoBody(job));
+      } catch (failure) {
+        useLocalJobs.setState(snapshot);
+        throw failure;
+      }
+    },
+    /** Same reasoning as the create's: the refetch brings back unchanged rows and the overlay reapplies. */
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: jobKeys.all });
+    },
+  });
+}
+
+/**
+ * Completing a job: the Pro's second verb, and the one that proves the claim record is the right shape.
+ *
+ * **The completion is written onto the record, not in place of it.** `completeJob` sets `completedAt` and
+ * leaves the Pro and the day they took it exactly where they were, which is why the store's `claims` covers
+ * every Job that has left `open` — claimed and done alike — and why `done` is read off the record rather than
+ * stored a second time. `ADR 0002` is the argument; a completion ends the hold, it does not end the record.
+ *
+ * The shape is the claim's, for the third and fourth times: store write first so both lists are correct before
+ * anything is sent, one `mutationFn` so the rollback can name what it is rolling back, the three fields
+ * restored wholesale, and no request at all for a `local-N` id. The rollback goes back to **claimed** rather
+ * than to open, because the Job is still held — it is just not finished.
+ *
+ * **The guard is the store's and it throws.** Completing a Job another Pro holds, or one already done, never
+ * reaches the network. Both screens offer nothing at all in those cases, which is the UI agreeing with the
+ * store rather than the thing keeping the rule.
+ *
+ * `status: 'done'` is forced onto the body rather than read off the Job, because the Job handed in is the one
+ * the screen was rendering and that one is still `claimed`. `completed` is the only field of ours the API has
+ * anywhere to put, so it is the only thing this request actually says.
+ */
+export function useCompleteJob() {
+  const proId = useSession(selectProId);
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, Job>({
+    mutationFn: async (job) => {
+      const { created, claims, deleted } = useLocalJobs.getState();
+      const snapshot: LocalJobs = { created, claims, deleted };
+
+      // Throws on a Job this Pro does not hold, or one already done, before anything is sent.
+      useLocalJobs.getState().completeJob(job.id, proId as string);
+
+      if (isLocal(job.id)) return;
+
+      try {
+        await updateTodo(job.id, toTodoBody({ ...job, status: 'done' }));
       } catch (failure) {
         useLocalJobs.setState(snapshot);
         throw failure;

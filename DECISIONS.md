@@ -987,3 +987,41 @@ than a `FlatList`, because the list is bounded by how many Jobs one person has t
 `TabPlaceholders.tsx` is gone with it, renamed to `JobsHomeScreen.tsx` and down to the Role branch alone —
 the last placeholder in the app became a real screen in this ticket. Both `login.e2e.ts` and `settings.e2e.ts`
 had to stop waiting on a sentence that no longer exists, which is the third and last time that edit was needed.
+
+## A Job another Pro holds can only be reached in Jest, because there is exactly one Pro
+
+`#12`'s acceptance criteria and `PRD.md`'s requirement 10 both turn on a Job **somebody else** holds offering
+nothing at all. On a device that state is unreachable, and not for want of trying: there is one Pro per Role by
+design, `PEOPLE.pro` is the only one, and a second Pro's claim record can only be written by setting the store
+directly. The fixtures bridge rewrites *requests*, so it cannot help — and seeding a claim through a `__DEV__`
+deep link was already considered and rejected by `#9` as a backdoor into the production store.
+
+So the branch is asserted in two halves. `JobDetailScreen.test.tsx` drives a claim by `pro-someone-else` and
+asserts that both the Claim and the Mark as done are absent; `pro-mine.e2e.ts` asserts the **done** half of the
+very same branch on a device, on a row and on the detail behind it, after really completing a Job. The store's
+guard — `Only the Pro holding a job can complete it`, with nothing sent — is asserted against the real store in
+`useJobs.test.tsx`, which is where the rule actually lives.
+
+## The fixtures deep link navigates to `/`, which only matters now that a spec drives it from another tab
+
+`?fixtureUser=` and `?fixtureFail=` are delivered as deep links to `repairs:///?…`, and Expo Router routes that
+to `/`. Every spec that used the bridge until now drove it from a screen that **is** `/` — the Client's posted
+jobs, the Pro's available list — so the navigation was a no-op and `fixtures.ts`' comment could truthfully say
+the link "lands on `/`, which is the tab the link is driven from".
+
+Claimed jobs is `/mine`. The first draft of its rollback test opened the link and then tapped a button on a tab
+it was no longer on, failing with "No elements found" on a button that was plainly in the code. The fix is one
+line — tap the tab again after the link — and it is written down because the next spec on a non-`/` screen will
+hit it too, and the symptom points at the button rather than at the link.
+
+## A group of rows is waited on for existence, not for visibility
+
+Claimed jobs renders two groups, each a `View` holding a heading and its rows. `toBeVisible` fails both of them,
+for two reasons at once: the entry above about transparent layout views, and Detox's 75% threshold, which a
+group drops below the moment an error card appears above it and pushes it down the screen. Both failures look
+like the group is missing.
+
+So the group's `testID` is waited on with `toExist`, which is the structural claim actually being made — "there
+is a done group now" — and what has to be *seen* is read off a row: the status pill, matched `withAncestor` its
+own row rather than as whichever pill Detox found first. The negative stays `not.toExist()`, which was never
+affected.
