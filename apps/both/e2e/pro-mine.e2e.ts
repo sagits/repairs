@@ -20,6 +20,7 @@
  * Detox's `expect` is imported under another name because Jest's global `expect` is also in scope.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { LOGIN_FORM, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -55,14 +56,14 @@ const statusOf = (jobId: string, status: string) =>
   element(by.text(status).withAncestor(by.id(`claimed-job-${jobId}`)));
 
 /**
- * Back to the Role picker without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
+ * Back to the login form without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
  * `login.e2e.ts`, `settings.e2e.ts` and `new-job.e2e.ts` have the same three lines. It empties both persisted
  * stores, which is what makes "the only claim on this device" true below.
  */
-const resetToThePicker = async () => {
+const resetToTheLoginForm = async () => {
   await device.launchApp({ newInstance: true });
   await device.openURL({ url: 'repairs:///?reset=1' });
-  await waitForVisible('continue-as-pro');
+  await waitForVisible(LOGIN_FORM);
 };
 
 /**
@@ -79,9 +80,9 @@ function today(): string {
 
 describe('pro claimed jobs', () => {
   it('says so when a Pro holds nothing, rather than showing an empty screen', async () => {
-    await resetToThePicker();
+    await resetToTheLoginForm();
 
-    await element(by.id('continue-as-pro')).tap();
+    await signIn('pro');
     await waitForVisible('tab-mine');
     await element(by.id('tab-mine')).tap();
 

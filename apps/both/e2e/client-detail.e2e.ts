@@ -30,6 +30,7 @@
  * Detox's `expect` is imported under another name because Jest's global `expect` is also in scope.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { LOGIN_FORM, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -56,15 +57,15 @@ const row = (jobId: number) => element(by.id(`posted-job-${jobId}`));
 const pullToRefresh = () => element(by.id('posted-jobs')).swipe('down', 'slow', 0.9, 0.5, 0.1);
 
 /**
- * Back to the Role picker without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
+ * Back to the login form without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
  * every other spec in this suite opens the same three lines. It also empties `deleted`, which is what makes
  * the Job this spec cancels available to cancel however often the file is run.
  */
 const signInAsTheClient = async () => {
   await device.launchApp({ newInstance: true });
   await device.openURL({ url: 'repairs:///?reset=1' });
-  await waitForVisible('continue-as-client');
-  await element(by.id('continue-as-client')).tap();
+  await waitForVisible(LOGIN_FORM);
+  await signIn('client');
   await waitForVisible('post-job');
 };
 

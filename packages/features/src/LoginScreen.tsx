@@ -86,7 +86,7 @@ function LoginForm({ signIn }: { signIn: (role: Role) => void }) {
 
   return (
     <Screen>
-      <ScrollView contentContainerClassName="gap-5 px-5 pb-6 pt-24" keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerClassName="gap-4 px-5 pb-6 pt-16" keyboardShouldPersistTaps="handled">
         <Text testID="login-title" className="text-center text-3xl font-semibold text-ink">
           Login
         </Text>

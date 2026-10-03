@@ -38,6 +38,7 @@
  * Detox's `expect` is imported under another name because Jest's global `expect` is also in scope.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { LOGIN_FORM, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -64,20 +65,20 @@ const waitForTextGone = (text: string) =>
   waitFor(element(by.text(text))).not.toBeVisible().withTimeout(VISIBLE_WITHIN);
 
 /**
- * Back to the Role picker without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
+ * Back to the login form without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
  * `login.e2e.ts` and `settings.e2e.ts` have the same three lines.
  */
-const resetToThePicker = async () => {
+const resetToTheLoginForm = async () => {
   await device.launchApp({ newInstance: true });
   await device.openURL({ url: 'repairs:///?reset=1' });
-  await waitForVisible('continue-as-client');
+  await waitForVisible(LOGIN_FORM);
 };
 
 describe('new job', () => {
   it('opens the form from the + in the posted-jobs header', async () => {
-    await resetToThePicker();
+    await resetToTheLoginForm();
 
-    await element(by.id('continue-as-client')).tap();
+    await signIn('client');
     await waitForVisible('post-job');
     await element(by.id('post-job')).tap();
 

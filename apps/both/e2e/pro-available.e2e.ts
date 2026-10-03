@@ -31,6 +31,7 @@
  * Detox's `expect` is imported under another name because Jest's global `expect` is also in scope.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { LOGIN_FORM, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -68,7 +69,7 @@ const pullToRefresh = () => availableJobs().swipe('down', 'slow', 0.9, 0.5, 0.1)
 describe('pro available jobs', () => {
   it('holds a skeleton in front of the first load, then shows the open Jobs', async () => {
     await device.launchApp({ newInstance: true, delete: true });
-    await waitForVisible('continue-as-pro');
+    await waitForVisible(LOGIN_FORM);
 
     /**
      * Synchronisation off for exactly this one tap. **Detox counts a pending fetch as "not idle", and an
@@ -79,7 +80,7 @@ describe('pro available jobs', () => {
      */
     await device.disableSynchronization();
     try {
-      await element(by.id('continue-as-pro')).tap();
+      await signIn('pro');
 
       await waitForVisible('available-jobs-skeleton-0');
       await waitForVisible(`available-job-${ON_PAGE_ONE.id}`);

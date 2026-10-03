@@ -34,6 +34,7 @@
  * and a screen name — and by text where the text is the assertion.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { LOGIN_FORM, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -64,20 +65,20 @@ const waitForText = (text: string) =>
   waitFor(element(by.text(text))).toBeVisible().withTimeout(VISIBLE_WITHIN);
 
 /**
- * Back to the Role picker without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
+ * Back to the login form without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
  * `login.e2e.ts` has the same two lines. This replaces a `launchApp({ delete: true })`.
  */
-const resetToThePicker = async () => {
+const resetToTheLoginForm = async () => {
   await device.launchApp({ newInstance: true });
   await device.openURL({ url: 'repairs:///?reset=1' });
-  await waitForVisible('continue-as-pro');
+  await waitForVisible(LOGIN_FORM);
 };
 
 describe('settings', () => {
   it('shows the person behind the current Role: name, email and the Role itself', async () => {
-    await resetToThePicker();
+    await resetToTheLoginForm();
 
-    await element(by.id('continue-as-pro')).tap();
+    await signIn('pro');
     await waitForVisible('tab-settings');
     await element(by.id('tab-settings')).tap();
 
@@ -133,17 +134,17 @@ describe('settings', () => {
     await expectElement(element(by.id('tab-mine'))).not.toExist();
   });
 
-  it('logs out to the Role picker, and the Role does not come back on the next launch', async () => {
+  it('logs out to the login form, and the Role does not come back on the next launch', async () => {
     await element(by.id('tab-settings')).tap();
     await waitForVisible('log-out');
 
     await element(by.id('log-out')).tap();
 
-    await waitForVisible('continue-as-client');
+    await waitForVisible(LOGIN_FORM);
 
     await device.launchApp({ newInstance: true });
 
-    await waitForVisible('continue-as-client');
+    await waitForVisible(LOGIN_FORM);
     await expectElement(element(by.id('tab-bar'))).not.toExist();
   });
 });
