@@ -1,85 +1,82 @@
 # Prompts Sum up
 
+## Prompts — writing the PRD
+
+The prompts used to produce `PRD.md`, in order. It was run from an agent inside this other project where I created a copy of Turno Hosts app (because it already had most the architecture, libraries, colors, and design system I needed for this task, so I would like to reuse it): https://github.com/sagits/sweep-public
+
+---
+
+**1.**
+
+> read about why this project was made and how it was made (archtectures)
+
+**2.**
+
+> this was made because I'm taking part in a job interview at turno (so I cloned their app in order to show that I can work on what they do). I also took all the archtectural decions, screenshots, videos, etc to shown like I will work day to day on their company (i did this based on their company needs, and how i think we should system design their apps based on their product).
+>
+> I'm on another step of their interview process and I need to do the create the app on this pdf. Help me write a new prd file (very similar to the first one, we will use the same stack apart from the API and the necessary changes to fit the narrative of this new app). Lets keep using react-native-web so we can also share this on a website at vercel later. keep using the monorepo, lets have 3 apps:
+> 1 - single shared app for both the client and pro
+> 2 - pro app
+> 3 - client app
+>
+> The ideia is to show that I have experience in both using the same app to show to 2 different types of users, and using 2 different apps sharing the same codebase. Lets reuse the components between the single shared app and the other 2 (I dont want to recreate components for the app 2 and 3, I want to reuse the components created for app 1). Lets use native wind and react native for layout (no need for gluestack-ui). Lets keep the e2e tests with detox and integration tests with jest + react testing library (like we did in this project). I'll later move this prd to a new folder and ask another agent to execute it (no need to add this to the prd). I'll also move the turno screenshots so we can use it as reference (the app will be for a different type of user, but we can reuse the same design system, add turno design system/ most used colors to the prd)
+>
+> `Mobile Take-Home — Repair Jobs App.pdf`
+
+**3.** *(answer to a multiple-choice question about the product name and the data layer)*
+
+> Product name: **Repairs (plain)** — "No branding exercise at all. Lets the reviewer focus on architecture, not naming."
+>
+> Data layer: deferred for clarification.
+
+**4.**
+
+> lets use tanstack query for the requests (and its own cache) and zustand to save the user data and any other data we need to zustand stores (local data, user data, forms data, anything we cant just save from API as it is)
+
+**5.**
+
+> lets use both tanstack query + zustand. tanstack query for all requests. Once we succefully POST/PUT we save data to a local zustand store, update tanstack local cache, and next time tanstack makes a GET query we use zustand to populate the saved POST data from the local store into the tanstack response (check the best way to do this, I basically want the app to use tanstack without having to think about these POST requests all the time, just like an app calling a normal API would, I centain that tan stak query has some kind of change we can do before it returns data to the user, so we can create custom useQuery hooks that will return the GET data appended with our store saved data)
+
+**6.**
+
+> add react hook form and zod for forms
+
+
+**7.**
+
+> add a guidelines section. Add to it: use jsdocs for all code. Dont add unnecessary comments, only add usefull comments and prefer to not add comments (add comments to the top of all files, but only comment a function or variable if extremelly needed, if the name already implies what it does, dont add a comment)
+
+**8.**
+
+> move code guidelines to the beginning
+
+**9.**
+
+> save all the prompts used here to a second prompts file, called prompts-PRD.md . Dont add anything about this to the PRD
+
+---
+
 1. Defined a PRD.md after 2 hours of discussion with Claude based on my experience. I decided on the best practices, like using TDD with Jest, E2E with Detox, the libraries I usually use (React Query, Zustand, React Hook Form, Zod, Native Wind), and defining a monorepo structure so we can reuse code
 2. Used Matt Pocock skills to turn the PRD.md into issues/tickets inside the Github repo
 3. Used Matt Pocock skills to implement the tickets, manually validated the outcome, and helped the agent fix any architectural errors like configuring detox, configuring jest, defining parallelism strategies to work on multiple tickets at once using git worktree
 
 ## Planning the spec
 
-1. Discussed PRD with Claude Code (see @Prompts-PRD.md)
+1. Discussed PRD with Claude Code (see "Prompts — writing the PRD" above)
 2. `/ask-matt I want to build whats in @PRD.md, what skills should I use?` — picked the route through
    the skills. The PRD is already a spec, so the answer was to skip the grilling and the spec step and
    merge in near the bottom: domain docs, then tickets, then build.
-3. `/domain-modeling @PRD.md` — wrote `GLOSSARY.md` and ADRs 0001 and 0002. Three terms the PRD left
-   overloaded came back as questions, and I settled them: cancelling is erasure rather than a fourth
-   status, a claim record outlives the claim it records, and the two lists both labelled "My Jobs" get
-   distinct names everywhere except the screen.
-4. "write both of those ADRs too" — ADR 0003 (three apps, parity enforced by a script) and ADR 0004
-   (why the Client's upstream user id is 13 and must not be tidied).
-5. `/to-tickets @PRD.md` — broke the PRD into tracer-bullet tickets with blocking edges.
-6. "split the data layer out of 06" — the Client's list ticket was carrying the API boundary, the
-   mapping, the overlay and a screen with five states. Split the data layer out as its own ticket,
-   verifiable by its tests alone, and left the overlay module whole inside it.
-7. "go" — published the 16 tickets to GitHub with native dependency edges.
-8. `/ask-matt does implement and implement-spec creates one branch per feature?` — neither does.
-   `/implement` commits to the current branch; `/implement-spec` runs one integration branch for the
-   whole spec with throwaway per-ticket branches underneath. Noted that per-ticket `/implement` on a
-   linear branch suits this repo better, since the commit history is part of what gets reviewed and a
-   graph of sixteen merges reads worse than a series of small commits.
-9. "save the prompts I used to @PROMPTS.md" — this file.
+3. `/domain-modeling @PRD.md` — wrote `GLOSSARY.md` and ADRs 0001 and 0002. These are part of Matt Pocock skills, it saves some words used on the PRD so the implementation agents understand what a Client user and a Pro user means.
+4. `/to-tickets @PRD.md` — broke the PRD into multiple tickets and asked me to review and I'm satisfied on the number of tickets, which tickets block each other, which can be worked on parallel on a git worktree, and the order they could be worked on. Then generate an issue on github for every ticket
 
 ## Building it
 
-Everything from here is the `/implement-spec` run, on 2026-10-02 into 2026-10-03. Most of it is about
-the two things that actually decided how long the build took: the Detox harness, and which tickets ran
-together.
 
-10. `/implement-spec`, with no argument — the spec being `PRD.md` and the tickets being the sixteen
+5. `/implement #1` to implement the ticket that will create the project template (turbo monorepo with detox and one mobile app called both)
+6. `/implement #5` Theorically we could implement #2, #3, #4 first, but #5 is the detox installation that I prefer to do in advance (because installing and running detox on the simulator can break very easily and its difficult to install)
+7. `/implement-spec`, with no argument — the spec being `PRD.md` and the tickets being the sixteen
     GitHub issues. One integration branch, `spec/repairs-mvp`, for the whole run, with a throwaway
     branch per ticket under it.
-11. Two setup questions, both answered in a way the rest of the run then depended on. **Detox tickets
-    run in the main checkout** rather than one worktree each: `apps/both/ios` is a 6.2 GB gitignored
-    native build, `scripts/e2e-test.sh` hardcodes Metro on `:8081`, and there is one simulator — so
-    per-ticket worktrees would have cost something like 68 GB and two hours of rebuilds to buy
-    concurrency the hardware cannot deliver anyway. And **an agent that hits a red spec fixes it
-    itself** instead of stopping to be watched: "I will not be looking to the screen all the time to
-    see your tests."
-12. "would headless detox be faster to test?" — no, and `DECISIONS.md` had already measured it. The
-    useful part was what the question flushed out: the cost in a Detox run is Metro's cold bundle, not
-    the flag.
-13. "keep metro warm between detox runs. use detox test --reuse, only reinstall the app if you really
-    need it." The harness this produced is what every later ticket ran on.
-14. "is anything else slowing us down on each implementation that we can change and will not affect
-    overall quality?" — four harness changes, one of which turned out to be built on a false premise:
-    `delete: true` was assumed to be the suite's most expensive operation and measured at about 0.6s,
-    so the reset-by-link that replaced it made the suite slightly *slower*. It was kept anyway, with
-    the measurement written down beside it, because it says what it means rather than achieving it by
-    side effect.
-15. "do your recommendation" — including the install stamp, which records which binary was installed
-    so that `--reuse` cannot silently test stale native code.
-16. "keep it and start #8" — the reset link stays despite the measurement, because it is documented
-    honestly and a negative check proved it load-bearing where it is used.
-17. Asked what skipping the two role-locked apps would save, then the web build, then: "i want to keep
-    all tickets, forget about removing any of them. Lets discuss ideas to speed development time,
-    maybe parallelism." The honest answer was that the critical path was the wall, not the lack of
-    parallelism — most of the remaining tickets needed the one simulator.
-18. "do all 5, batch the tickets you think make sense and will speed things up."
-19. "can we do 10, 11, 12 on the same agent?" — yes, and it was the better batch: #11 has no spec of
-    its own, and all three are one design around the claim record. Then "can we also do #9 along with
-    #10, #11, #12?" and, once the numbers were on the table, "ok keep #9 separate" — four tickets
-    would have outgrown the context window, and compaction is exactly where a batch loses the shared
-    context that made it worth batching.
-20. "lets also not do #13, we will leave it for the future", then "skip #14 too". Both deferred rather
-    than cancelled: commented on the issues, left open, unblocked from the docs ticket, with nothing
-    built and nothing deleted. The README names both as gaps.
-21. "keep it as it is, dont add anything new" — declining a guard that would have stopped
-    `e2e-test.sh` reusing a Metro belonging to a different worktree. A hazard that had not happened
-    did not earn code.
-22. "can you spawn a subagent to merge what we already have commited to main and keep working on this
-    feature/spec branch? Also add a small readme explaining the project and how to run (what we
-    already have working, dont talk about what we dont have)" — `main` was fast-forwarded mid-run and
-    got a deliberately partial README, covering the Client side only. This one extends it.
-23. "spawn a subagent to push main" — done directly instead, being one command that touches no working
-    tree.
-
-Made the necessary changes to README, asked the agent to add a Login screen with e-mail, password, and user type switch (and add the necessary tests)
+8. `don't implement #14 and #15 now`. Those are the tickets I left to a nother version, but decided to do then today
+9. `Make the login screen similar to this picture with e-mail ,password and a switch for user type`. Sent a picture from a login screen of an iOS app I found on Google because originally the agents developed only two buttons to change between Pro and Client user
+10. `/implement #14` - on one agent, and  `/implement #15 on a git worktree` on another agent. I decided to implement these 2 as a follow up. #14 adds 2 more apps that share the same layout and logic: client app, and pro app. The ideia is to show how can we share code and components on a monorepo. #15 add web support. As I decided to use react-native-web, the idea was to show that we can also turn this app into a website (with almost the same layout) and use the same code and components on it.

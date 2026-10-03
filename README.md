@@ -109,7 +109,7 @@ Written before the skills were installed:
 | File | What it is |
 | --- | --- |
 | `PRD.md` | The product requirements document, and the spec everything here was built from. |
-| `prompts-PRD.md` | The conversation that produced it. |
+| `PROMPTS.md` | The prompts behind it: the conversation that produced the PRD, then the build. |
 
 From the [Matt Pocock skills](https://github.com/mattpocock/skills), installed with
 `/setup-matt-pocock-skills` and pinned by `skills-lock.json`:
