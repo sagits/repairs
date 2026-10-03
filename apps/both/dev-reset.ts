@@ -5,10 +5,16 @@
  * ## Why this exists at all
  *
  * A Detox spec that wants a signed-out opening used to ask for `launchApp({ delete: true })`, which
- * uninstalls and reinstalls the app *per test*. That is the single most expensive thing the suite does,
- * it happens regardless of `detox test --reuse`, and every list ticket still ahead wants the same
- * opening. Clearing the two persisted stores is what those tests actually need; deleting the app was
- * only ever the blunt way to get it.
+ * uninstalls and reinstalls the app *per test*, regardless of `detox test --reuse`. Clearing the two
+ * persisted stores is what those tests actually need; deleting the app was only ever the blunt way to
+ * get it, and every list ticket still ahead wants the same opening.
+ *
+ * **It is not the faster of the two, and nobody should convert a launch expecting it to be.** The
+ * reinstall was assumed to cost double-digit seconds; measured on the permanently booted simulator with
+ * a Debug binary this small, it costs about 0.6s, and this costs a relaunch plus an `openURL` round trip,
+ * which is marginally more. `DECISIONS.md` has the numbers. What it buys is saying what it means — empty
+ * the stores — rather than achieving that as a side effect of an uninstall, and not depending on how a
+ * given Detox version treats `delete` under `--reuse`.
  *
  * ## Why a deep link, and why this spelling
  *
