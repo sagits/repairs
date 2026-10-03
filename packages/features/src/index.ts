@@ -1,4 +1,7 @@
-/** Every screen in the app. The three app directories are thin shells that re-export from here. */
+/**
+ * Every screen in the app. `apps/both/app/` is a thin shell that re-exports from here; the two
+ * role-locked apps `ADR 0003` plans would be the same shell again, and are deferred (issue #13).
+ */
 export { AppProviders } from './AppProviders';
 export { AppRoleProvider, useAppRole } from './appRole';
 export { AvailableJobsScreen } from './AvailableJobsScreen';

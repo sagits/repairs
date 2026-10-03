@@ -1085,3 +1085,72 @@ spec that would have passed either way.
 real 254-row dataset, and this spec is read-only by its ticket's own wording, so it stays that way. It reads a
 list, reads one record, and reads a 404; it writes nothing, persists nothing, and leaves no state for the next
 spec to trip on.
+
+## The three-app split is deferred, so `ADR 0003` now describes a plan rather than the code
+
+Renato deferred **#13 — "Repairs Client and Repairs Pro, with parity enforced"** on 2026-10-03, part way
+through the run, and the issue is commented and left open rather than closed. Nothing was built and nothing
+was removed: `apps/client` and `apps/pro` were never created, `scripts/check-app-parity.mjs` does not exist,
+and no `check:apps` script was added.
+
+The groundwork that is already in the tree stays, and is still right: `appRole` as a prop on `AppProviders`
+with a context behind it, `RoleGuard`, and the rule that an `apps/*/app/` file is a route and a re-export and
+nothing else. Its payoff is simply not demonstrated.
+
+**`ADR 0003` is therefore the one ADR the code no longer satisfies**, and that matters more than it sounds,
+because the ADR's own rejected option is "one app, `apps/both`, and a paragraph in the README claiming the
+code would support splitting — rejected: the claim is the whole point, and an unexecuted claim is worth
+nothing." That is exactly the position this repo is now in. So the README does not write that paragraph in
+any form, not even as a "coming soon": it names the deferral, points at issue #13, and says nothing about
+what the layout would support. The ADR is left as written rather than edited, because an ADR records a
+decision at a date and this entry is what records that the decision outran the build.
+
+## The web target is deferred too, and it takes a visible product gap with it
+
+**#14 — "The web target: static export, sidebar at `md:`, Vercel"** was deferred on 2026-10-03 alongside
+#13. Commented, left open, nothing built, nothing deleted. `react-native-web` and `react-dom` stay in
+`apps/both/package.json`, the `build:web` scripts stay in the app and the root `package.json`, and the
+`build:web` task stays in `turbo.json` with `outputs: ["dist/**"]`. **None of it has ever been run**, so
+`pnpm build:web` is unverified rather than working, and nothing has been deployed anywhere.
+
+The part worth separating out is that one of that ticket's criteria was never web-only: "at `md:` and above
+the tab bar is a left sidebar with content centred" was to be written in responsive classes, so a wide tablet
+got it on native too. Deferring the ticket leaves `RoleTabBar` a bottom bar on every device. **That is a
+product gap, not only a missing platform**, and the README names it as one.
+
+`PRD.md:878-886` describes the static export, `web.output = "static"` and the Vercel rewrite for `/job/:id`
+as though they are done. They are not, and the stack verification already recorded that the PRD's rewrite is
+not how Expo documents dynamic routes under `output: "static"` — so whoever builds this starts by checking
+that, not by trusting the spec.
+
+## Every commit carries a co-author trailer, against an explicit requirement, and the history is left alone
+
+`PRD.md`'s deliverables section and **#16 — "README, PROMPTS.md and DECISIONS.md"** both require that every
+commit be authored by Renato Probst and by nobody else: "no `Co-Authored-By:` trailer, no `Generated with`
+line, no tool attribution of any kind … This overrides any default attribution behaviour the implementing
+agent has been configured with. `PROMPTS.md` is where the use of AI is disclosed, in full and on purpose; the
+commit log is not."
+
+**That requirement was not met, and this entry is the record of why.** It lives in the spec's deliverables
+section and in the last ticket of sixteen, so it was read when that ticket was picked up — by which point 55
+of the 58 commits on `spec/repairs-mvp` carried
+`Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`, and `main` had been pushed to `origin`
+with 50 of them. The orchestration notes every implementer worked from had instructed the trailer explicitly,
+which is how it ended up on all but the three earliest commits rather than on some.
+
+The choice offered was a history rewrite — `filter-branch` or `filter-repo` over 59 commits, then a
+force-push over a pushed `main` — or leaving the history and recording the deviation. **Renato chose to leave
+the history.** So:
+
+- **No rewrite and no force-push.** Rewriting a pushed branch to satisfy a metadata requirement risks the one
+  thing the requirement exists to protect, which is a readable, trustworthy history.
+- **The trailer stays on the commits made after the discovery too**, including this ticket's. Switching
+  spelling part way through would leave a history that is half-cleaned, which reads like an abandoned attempt
+  and is harder to explain than a uniform convention with an entry against it.
+- **The halves of the requirement that did hold, held.** The author is `Renato Probst` on all 59 commits, and
+  there is no "Generated with" line anywhere in the history or in any PR description.
+
+The requirement's own rationale is the fairest thing to measure the outcome against: `PROMPTS.md` is where
+the use of AI is disclosed, in full and on purpose, and it is — twenty-five entries, including the
+corrections. The commit log now discloses it a second time, which is not what was asked for. Recorded as
+unmet rather than quietly tidied.
