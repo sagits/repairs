@@ -30,6 +30,7 @@ import {
   fetchTodo,
   fetchTodoPage,
   fetchUserTodos,
+  updateTodo,
 } from './client';
 import { toJob, toTodoBody } from './map';
 import { applyOverlay, applyOverlayToPages, overlayClaim } from './overlay';
@@ -44,6 +45,14 @@ import { availableScope, clientScope } from './scopes';
  */
 const selectClientId = ({ user }: { user: { id: number | string } | null }) =>
   typeof user?.id === 'number' ? user.id : undefined;
+
+/**
+ * The signed-in Pro's id, or `undefined` when the session is not a Pro's. The mirror of the above, and the
+ * type check is the honest test for the same reason: there is no real Pro upstream, so their id is a string
+ * this app invented, and a Client's is a number the API owns.
+ */
+const selectProId = ({ user }: { user: { id: number | string } | null }) =>
+  typeof user?.id === 'string' ? user.id : undefined;
 
 /** The three raw slices both hooks need, as references that only change when the store does. */
 const useLocalSlices = () => ({
@@ -268,6 +277,53 @@ export function useCancelJob() {
 
       try {
         await deleteTodo(job.id);
+      } catch (failure) {
+        useLocalJobs.setState(snapshot);
+        throw failure;
+      }
+    },
+    /** Same reasoning as the create's: the refetch brings back unchanged rows and the overlay reapplies. */
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: jobKeys.all });
+    },
+  });
+}
+
+/**
+ * Claiming a job: the Pro's first verb, and the create's shape for the third time — the store write first so
+ * every list is correct before anything is sent, one `mutationFn` rather than `onMutate` plus a request so
+ * the rollback can name what it is rolling back, and the three fields restored wholesale rather than the one
+ * record spliced out. The entries on `useCreateJob` have the full argument for all three.
+ *
+ * **The store writes a snapshot of the Job, not a patch, and that is the point of the whole design.** A
+ * Pro's claimed-jobs list has to render on a cold start, when the query cache is empty and the Job in
+ * question is on page four of the API — so the claim record carries the Job rather than a reference to one,
+ * and `ClaimedJobsScreen` is a pure local read with no fetch at all. `ADR 0002` is the argument.
+ *
+ * **The guard is the store's and it throws, which is what makes this mutation's `error` screen-ready.**
+ * Claiming a Job someone already holds, or one that has left `open`, never reaches the network: `claimJob`
+ * throws the sentence the screen shows. The button is not the thing keeping the rule — it is absent for the
+ * same reason, but requirement 10 is enforced one layer below it.
+ *
+ * **A Local job is a pure local write with no request,** same branch as the create's and the cancel's: there
+ * is no upstream record to tell, so `PUT /todos/local-1` would be a 404 fired to look consistent.
+ */
+export function useClaimJob() {
+  const proId = useSession(selectProId);
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, Job>({
+    mutationFn: async (job) => {
+      const { created, claims, deleted } = useLocalJobs.getState();
+      const snapshot: LocalJobs = { created, claims, deleted };
+
+      // Throws on a Job that is no longer open, before anything is sent. The message is the store's own.
+      useLocalJobs.getState().claimJob(job, proId as string);
+
+      if (isLocal(job.id)) return;
+
+      try {
+        await updateTodo(job.id, toTodoBody(job));
       } catch (failure) {
         useLocalJobs.setState(snapshot);
         throw failure;

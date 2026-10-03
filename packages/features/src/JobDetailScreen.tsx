@@ -6,9 +6,9 @@
  * work out from under someone, so the button is gone and a line says why. A disabled button that cannot
  * explain itself is the worst of both — it looks like the app is broken rather than like the rule it is.
  *
- * `#11` and `#12` add the Pro's two actions beside the Client's, in the same place and off the same two
- * values: **Claim** on an open Job, **Mark as done** on one they hold, and nothing on a Job another Pro
- * holds. `PRD.md` has that list; the branch below is where it goes.
+ * The Pro's actions sit in the branch beside the Client's and off the same two values: **Claim** on an open
+ * Job, **Mark as done** on one they hold, and nothing at all on a Job another Pro holds or one already done.
+ * They are owned by this component rather than by a child, for a reason the branch itself records.
  *
  * **Cancelling is confirmed in the app, not in `Alert.alert`.** A system alert is a separate element tree
  * that React Native Testing Library cannot see without mocking the module and that Detox reaches on iOS only
@@ -23,10 +23,11 @@
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import { useCancelJob, useJob } from '@repairs/api';
+import { useCancelJob, useClaimJob, useJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
 import { colors, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job, JobStatus, User } from '@repairs/types';
+import { ActionButton, ActionError } from './JobActions';
 import { asDay, proName } from './jobText';
 
 /**
@@ -195,10 +196,11 @@ function CancelJob({ job }: { job: Job }) {
   return (
     <View className="gap-3">
       {cancelJob.error ? (
-        <View testID="cancel-job-error" className="rounded-card border border-danger bg-surface px-4 py-4">
-          <Text className="text-base font-semibold text-danger">Could not cancel this job</Text>
-          <Text className="mt-1 text-sm leading-5 text-slate">{cancelJob.error.message}</Text>
-        </View>
+        <ActionError
+          testID="cancel-job-error"
+          title="Could not cancel this job"
+          message={cancelJob.error.message}
+        />
       ) : null}
       {confirming ? (
         <CancelConfirm
@@ -221,10 +223,19 @@ function CancelJob({ job }: { job: Job }) {
   );
 }
 
-/** The Job itself: everything known about it, and nothing invented where the API has no field. */
-function JobCard({ job, user }: { job: Job; user: User | null }) {
+/**
+ * The Job itself: everything known about it, and nothing invented where the API has no field.
+ *
+ * `muted` is the states table's "the affected row takes a muted tint", on the one screen where there is
+ * anything left to tint. A Pro's action on a list removes or moves the row it was about before a frame could
+ * render; here the Job stays put through its own claim, so the card can say that something is happening to it.
+ */
+function JobCard({ job, user, muted }: { job: Job; user: User | null; muted: boolean }) {
   return (
-    <View className="rounded-card bg-surface px-4 py-4 shadow-card">
+    <View
+      testID="job-card"
+      className={`rounded-card bg-surface px-4 py-4 shadow-card ${muted ? 'opacity-50' : ''}`}
+    >
       <View className="flex-row items-start justify-between gap-3">
         <Text testID="job-title" className="flex-1 text-xl font-semibold text-ink">
           {job.title}
@@ -263,6 +274,15 @@ export function JobDetailScreen() {
    */
   const isOwnJob = job?.clientId === user?.id;
 
+  /**
+   * The Pro's claim lives **here rather than inside a child**, which the available list learned the hard way:
+   * the store write lands before the request, so anything that branches off the Job's new status unmounts the
+   * component holding the mutation and loses the failure with it. Here the branch below is in the same scope
+   * as the mutation, so the Claim can keep rendering — spinning — until the request has settled either way.
+   */
+  const claim = useClaimJob();
+  const claiming = claim.isPending;
+
   return (
     <Screen>
       <HeaderBand title="Job" action={<BackButton onPress={() => router.back()} />} />
@@ -273,7 +293,14 @@ export function JobDetailScreen() {
       ) : (
         <ScrollView contentContainerClassName="gap-3 px-5 py-6">
           {error ? <JobError message={error.message} onRetry={refetch} /> : null}
-          {job ? <JobCard job={job} user={user} /> : null}
+          {claim.error ? (
+            <ActionError
+              testID="claim-job-error"
+              title="Could not claim this job"
+              message={claim.error.message}
+            />
+          ) : null}
+          {job ? <JobCard job={job} user={user} muted={claiming} /> : null}
           {job && isOwnJob && user?.role === 'client' ? (
             job.status === 'open' ? (
               <CancelJob job={job} />
@@ -282,6 +309,24 @@ export function JobDetailScreen() {
                 {WHY_NOT_CANCELLABLE[job.status]}
               </Text>
             )
+          ) : null}
+          {/**
+           * The Pro's side of the same branch. **Claim on an open Job, and nothing at all on one somebody
+           * else holds** — not a disabled button and not a line of explanation, because a Pro reading a Job
+           * another Pro took has no relationship to it and an empty space is the honest account of that. The
+           * store refuses the claim either way; this is the screen agreeing with it rather than enforcing it.
+           *
+           * `|| claiming` is what keeps the button on screen through its own request. Without it the status
+           * flips to claimed on the optimistic write and the button vanishes mid-flight, so the spinner that
+           * the states table asks for would never be seen and a failure would have nothing to roll back to.
+           */}
+          {job && user?.role === 'pro' && (job.status === 'open' || claiming) ? (
+            <ActionButton
+              testID="claim-job"
+              label="Claim"
+              pending={claiming}
+              onPress={() => claim.mutate(job)}
+            />
           ) : null}
         </ScrollView>
       )}

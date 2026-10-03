@@ -38,7 +38,15 @@ import { by, device, element, expect as expectElement, waitFor } from 'detox';
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
 
-const CLAIMED_JOBS = 'The jobs you have claimed will appear here.';
+/**
+ * Claimed jobs is a real screen now, so there is no placeholder sentence left to wait on either. A Pro who
+ * holds nothing sees its empty state, and the glyph is what this spec means by "the Pro's claimed list": it
+ * draws, it needs no request to arrive, and no other screen has one. `#12` owns the contents.
+ *
+ * The same edit `#7` and `#10` each had to make here and in `login.e2e.ts` when they replaced a placeholder
+ * with a list. The placeholders are now all gone, so this is the last of them.
+ */
+const CLAIMED_JOBS_EMPTY = 'claimed-jobs-empty-glyph';
 
 /**
  * Posted jobs is a real list now, so there is no placeholder sentence left to wait on. The `+` in its
@@ -90,7 +98,7 @@ describe('settings', () => {
   it('opens the Pro-only route for a Pro, so the link itself is known to be honoured', async () => {
     await device.openURL({ url: PRO_ONLY_ROUTE });
 
-    await waitForText(CLAIMED_JOBS);
+    await waitForVisible(CLAIMED_JOBS_EMPTY);
   });
 
   it('switches Role, and the tab bar and the list change underneath', async () => {
@@ -121,7 +129,7 @@ describe('settings', () => {
     await device.openURL({ url: PRO_ONLY_ROUTE });
 
     await waitForVisible(POSTED_JOBS_HEADER);
-    await expectElement(element(by.text(CLAIMED_JOBS))).not.toExist();
+    await expectElement(element(by.id(CLAIMED_JOBS_EMPTY))).not.toExist();
     await expectElement(element(by.id('tab-mine'))).not.toExist();
   });
 

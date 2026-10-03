@@ -146,4 +146,24 @@ describe('pro available jobs', () => {
     await waitForGone('retry-available-jobs');
     await expectElement(element(by.id(`available-job-${ON_PAGE_ONE.id}`))).toBeVisible();
   });
+
+  /**
+   * The claim, from the list. **The row leaves because the store was written, not because the list was asked
+   * again** — requirement 12 for this verb, with nothing refreshed by hand anywhere in the app.
+   *
+   * It goes last because it is the one test here that changes what the others see: the row it claims is the
+   * row every assertion above waits on. Where the claimed Job *goes* is `pro-mine.e2e.ts`, which claims its
+   * own from a reset rather than inheriting this one — the two specs share a device and that would be a
+   * dependency on file order rather than on anything either spec says.
+   */
+  it('claims a Job from the list, and the row leaves it', async () => {
+    await availableJobs().scrollTo('top');
+    await element(by.id(`claim-job-${ON_PAGE_ONE.id}`)).tap();
+
+    await waitForGone(`available-job-${ON_PAGE_ONE.id}`);
+    // Still gone once the invalidation's refetch has answered, which is `ADR 0002`'s invariant: the server
+    // says the todo is as present as ever and the overlay drops it again. A row that came back here would
+    // mean the claim had been written somewhere the refetch could overwrite.
+    await expectElement(element(by.id(`available-job-${ON_PAGE_ONE.id}`))).not.toExist();
+  });
 });

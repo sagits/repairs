@@ -12,11 +12,19 @@ export {
   fetchTodo,
   fetchTodoPage,
   fetchUserTodos,
+  updateTodo,
 } from './client';
 export { toJob, toTodoBody } from './map';
 export { applyOverlay, applyOverlayToPages, overlayClaim, prepareRows } from './overlay';
 export { createQueryClient, jobKeys } from './queryClient';
 export { ApiErrorSchema, TodoListSchema, TodoSchema, type Todo, type TodoList } from './schemas';
 export { availableScope, clientScope } from './scopes';
-export { useAvailableJobs, useCancelJob, useClientJobs, useCreateJob, useJob } from './useJobs';
+export {
+  useAvailableJobs,
+  useCancelJob,
+  useClaimJob,
+  useClientJobs,
+  useCreateJob,
+  useJob,
+} from './useJobs';
 export type { JobDetail } from './useJobs';

@@ -19,10 +19,11 @@
  */
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAvailableJobs } from '@repairs/api';
+import { useAvailableJobs, useClaimJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
 import { colors, HeaderBand, Screen } from '@repairs/ui';
 import type { Job, User } from '@repairs/types';
+import { ActionButton, ActionError } from './JobActions';
 import { JobListSkeleton, useSkeletonHold } from './listSkeleton';
 
 /**
@@ -34,11 +35,27 @@ const postingClient = (job: Job, user: User | null) =>
   job.clientId === user?.id ? 'You' : `Client #${job.clientId}`;
 
 /**
- * One row: the Job and who posted it. The card is the way into the detail — the row *is* the Job, so a row
- * that opens what it shows needs no second affordance. `#11` adds the Claim button beside the Client,
- * which is why that line is a row of its own rather than a line of text.
+ * One row: the Job, who posted it, and the Claim. The card is the way into the detail — the row *is* the Job,
+ * so a row that opens what it shows needs no second affordance — and the Claim is a button inside it rather
+ * than the row's own press, because the two do different things.
+ *
+ * **There is no pending state on this row, and that is the optimistic write's doing rather than an omission.**
+ * `claimJob` writes the store before the request leaves, `availableScope` reads the status it just changed,
+ * and the row is gone within the tick — so a spinner here would be a frame nobody sees. The spinner and the
+ * muted card belong to the screens where the Job *stays*: `JobDetailScreen` for a claim, and claimed jobs for
+ * a completion. `DECISIONS.md` has the argument, because `PRD.md`'s states table asks for both at once.
  */
-function AvailableJobRow({ job, user, onOpen }: { job: Job; user: User | null; onOpen: () => void }) {
+function AvailableJobRow({
+  job,
+  user,
+  onOpen,
+  onClaim,
+}: {
+  job: Job;
+  user: User | null;
+  onOpen: () => void;
+  onClaim: () => void;
+}) {
   return (
     <Pressable
       testID={`available-job-${job.id}`}
@@ -51,6 +68,7 @@ function AvailableJobRow({ job, user, onOpen }: { job: Job; user: User | null; o
       </Text>
       <View className="mt-2 flex-row items-center justify-between gap-3">
         <Text className="flex-1 text-sm leading-5 text-inkMuted">{postingClient(job, user)}</Text>
+        <ActionButton testID={`claim-job-${job.id}`} label="Claim" onPress={onClaim} />
       </View>
     </Pressable>
   );
@@ -128,14 +146,35 @@ export function AvailableJobsScreen() {
   const showSkeleton = useSkeletonHold(isPending);
 
   /**
+   * One claim for the whole list, and **not one per row, which was the first attempt and could not work.**
+   * The store write happens before the request, so the row the claim is about leaves the list immediately —
+   * `availableScope` drops it — and a mutation living inside that row is unmounted along with it. When the
+   * request then fails and the rollback puts the row back, it comes back with a *fresh* mutation that has
+   * never heard of the failure, and the error card never renders. The thing that outlives the row has to own
+   * the mutation, which is the screen.
+   */
+  const claim = useClaimJob();
+
+  /**
    * The error card is the list's header, which is what gets all three cases right in one expression: with
    * rows on screen it sits above them, with none it is the only thing there, and the empty state steps
    * aside for it — because "there is no work" is the wrong thing to tell someone whose list simply failed
-   * to arrive.
+   * to arrive. A failed claim renders in the same place, which is what "inline, above the row" means on a
+   * list whose rows come and go.
    */
-  const errorCard = error ? (
-    <AvailableJobsError message={error.message} onRetry={() => void refetch()} />
-  ) : null;
+  const errorCard =
+    error || claim.error ? (
+      <View className="gap-3">
+        {error ? <AvailableJobsError message={error.message} onRetry={() => void refetch()} /> : null}
+        {claim.error ? (
+          <ActionError
+            testID="claim-job-error"
+            title="Could not claim this job"
+            message={claim.error.message}
+          />
+        ) : null}
+      </View>
+    ) : null;
 
   return (
     <Screen>
@@ -148,7 +187,12 @@ export function AvailableJobsScreen() {
           data={data ?? []}
           keyExtractor={(job) => job.id}
           renderItem={({ item }) => (
-            <AvailableJobRow job={item} user={user} onOpen={() => router.push(`/job/${item.id}`)} />
+            <AvailableJobRow
+              job={item}
+              user={user}
+              onOpen={() => router.push(`/job/${item.id}`)}
+              onClaim={() => claim.mutate(item)}
+            />
           )}
           // Half a screen from the bottom, so the next page is usually already there by the time it would
           // have been needed. The guard is react-query's as well, but asking only when there is something

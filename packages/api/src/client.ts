@@ -106,6 +106,26 @@ export const deleteTodo = async (id: string): Promise<void> => {
 };
 
 /**
+ * A claim and a completion, which upstream are the same request. **It returns nothing, for the third time
+ * and the same reason** — `PUT /todos/{id}` echoes the record back with the body merged in and keeps none
+ * of it, so nothing reads the response and there is nothing for a schema to protect.
+ *
+ * The two verbs send the same body through `toTodoBody` and differ only in what `status` it was built
+ * from, because `completed` is the one field of ours the API has anywhere to put. A claim therefore tells
+ * the server nothing it did not already know, and the request still goes out: its pending state and its
+ * failure are states a screen has to render, and neither is real unless a real request is behind it.
+ */
+export const updateTodo = async (id: string, body: Omit<Todo, 'id'>): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) throw await errorFrom(response);
+};
+
+/**
  * One Job, for the detail screen. The 404 this answers on an unknown id is the whole reason `ApiError`
  * carries a `status`: it is the not-found screen, where every other failure is the error card.
  */

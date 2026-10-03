@@ -929,3 +929,61 @@ envelope, which is the same seam `JobDetailScreen.test.tsx` uses to fail a singl
 **Rows are matched by `testID` and never by title, in both seams.** The fixtures derive a title from
 `id % 12`, so every twelfth row reads the same sentence and `by.text(…)` matches twenty-one elements once
 three pages are loaded — which Detox fails rather than ignores. The id is the only unique handle a row has.
+
+## A mutation cannot live inside the row it is about, because the optimistic write unmounts it
+
+The first draft of the available list put `useClaimJob` in `AvailableJobRow`, one per row, so that each row
+could carry its own spinner and its own error card. It cannot work, and the way it fails is worth recording
+because every optimistic list in this app has the same shape.
+
+`claimJob` writes the store **before** the request goes out. `availableScope` reads a status that write has
+just changed, `select` re-runs, and the row is dropped within the tick — taking the mutation inside it along.
+When the request then fails and the rollback puts the row back, it comes back with a *fresh* `useMutation`
+that has never heard of the failure, so `claim.error` is `null` and the card never renders. The test for it
+failed on exactly that: the rollback was correct in the store and invisible on screen.
+
+The mutation therefore belongs to the thing that outlives the row, which is the screen. The failed claim's
+card renders in the list's header, above the rows, which is also what "an inline error appears above it"
+means on a list whose rows come and go.
+
+## The claim's pending state has nowhere to show on the available list, and the muted tint has nowhere at all
+
+`#11`'s acceptance criteria ask that "while the request is in flight the button spins and the affected row
+takes a muted tint", and `PRD.md`'s states table says the same. Driving it found that the two halves of that
+sentence fight the optimistic write, in two different ways.
+
+**The spinner.** On the available list the affected row is *gone* before a frame could render it, for the
+reason above — so a spinner there would be markup nobody ever sees. The screen where it is real is
+`JobDetailScreen`, because the Job stays on screen through its own claim: the branch reads
+`job.status === 'open' || claiming`, which keeps the Claim button present and spinning until the request has
+settled either way. Without that `|| claiming` the button vanishes on the optimistic write and the failure has
+nothing to roll back to. The disabled state is asserted beside it and matters more than the spinner: a second
+press would reach the store's guard and come back with "That job is no longer open", which is a confusing
+thing to say to someone who tapped the same button twice.
+
+**The muted tint is asserted in neither seam, and cannot be.** NativeWind resolves `className` into native
+styles and leaves neither a `className` nor a `style` prop on the rendered node, so there is nothing for a
+React Native Testing Library query to read; Detox has no matcher for opacity. The tint is in the code, on the
+Job card during a claim and on a claimed row during a completion, and it is checked **by eye** — which is
+where `PRD.md` already puts the whole visual layer, against `reference/`. Recorded so the gap reads as a
+decision rather than an oversight.
+
+## Claimed jobs is the one screen that asks for nothing, so its test counts requests
+
+`ClaimedJobsScreen` reads `claims` out of the Local job store, filters on the signed-in Pro, and lays each
+record back over its own snapshot with `overlayClaim` — the same function the lists and the detail use, so a
+claimed Job reads `Claimed` here for the same reason it does everywhere else. There is **no query at all**.
+
+That makes `fetchCount === 0` the load-bearing assertion in `ClaimedJobsScreen.test.tsx`, and the reason the
+counter is wrapped around `fetch` for every test in the file rather than for one: the rows, the `proId` filter
+and the empty state would all be just as true of a screen that quietly fetched. On the device the same claim is
+made by **restarting the app** — a relaunch empties the react-query cache, nothing has been asked for, and the
+row is still there out of the snapshot. A patch-shaped claim record would render an id and nothing else.
+
+Three things follow from having no query, and all three are absences on purpose: **no skeleton, no pull to
+refresh and no error state.** A local read has none of those states to be in. It is also a `ScrollView` rather
+than a `FlatList`, because the list is bounded by how many Jobs one person has taken rather than by a dataset.
+
+`TabPlaceholders.tsx` is gone with it, renamed to `JobsHomeScreen.tsx` and down to the Role branch alone —
+the last placeholder in the app became a real screen in this ticket. Both `login.e2e.ts` and `settings.e2e.ts`
+had to stop waiting on a sentence that no longer exists, which is the third and last time that edit was needed.

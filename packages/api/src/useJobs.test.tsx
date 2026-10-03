@@ -32,7 +32,7 @@ import { CLIENT_USER_ID, FIXTURE_FAILURE_ID } from '@repairs/testing';
 import type { Job } from '@repairs/types';
 import { ApiError, API_BASE_URL } from './client';
 import { createQueryClient, jobKeys } from './queryClient';
-import { useAvailableJobs, useCancelJob, useClientJobs, useJob } from './useJobs';
+import { useAvailableJobs, useCancelJob, useClaimJob, useClientJobs, useJob } from './useJobs';
 
 const PRO_ID = 'pro-1';
 
@@ -414,4 +414,109 @@ it("fails with the store's own message on a Job that is no longer open, and send
   await waitFor(() => expect(result.current.isError).toBe(true));
   expect(useLocalJobs.getState().deleted).toEqual([]);
   expect(fetchCount).toBe(0);
+});
+
+/**
+ * `useClaimJob` — the Pro's first verb, and the create's shape for the third time: the store write first so
+ * every list is correct before anything is sent, one `mutationFn` so the rollback can name what it is
+ * rolling back, and no request at all for a `local-N` id.
+ *
+ * **The claim record is a snapshot of the Job, not a patch, and that is the point of the whole design.** A
+ * Pro's claimed-jobs list has to render on a cold start, when the query cache is empty and the Job in
+ * question is on page four of the API — so the record carries the Job rather than a reference to one, and
+ * the list is a pure local read. `ADR 0002` argues it; this is where it is asserted.
+ */
+const signedInAsThePro = () => useSession.getState().signIn('pro');
+
+it('records the claim as a snapshot of the Job, then tells the server, in that order', async () => {
+  signedInAsThePro();
+  const { result } = await renderHook(() => useClaimJob(), { wrapper });
+
+  await act(async () => {
+    await result.current.mutateAsync(anOpenJobOf(A_CLIENT_JOB.id));
+  });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(useLocalJobs.getState().claims[A_CLIENT_JOB.id]).toMatchObject({
+    proId: PRO_ID,
+    snapshot: { id: A_CLIENT_JOB.id, title: A_CLIENT_JOB.title, status: 'open' },
+  });
+  expect(calls).toEqual([{ method: 'PUT', url: `${API_BASE_URL}/todos/${A_CLIENT_JOB.id}` }]);
+});
+
+it('claims a Local job with no request at all, because there is nothing upstream to tell', async () => {
+  signedInAsThePro();
+  const local = useLocalJobs.getState().createJob({ title: 'Garage door will not lift' }, CLIENT_USER_ID);
+  const { result } = await renderHook(() => useClaimJob(), { wrapper });
+
+  await act(async () => {
+    await result.current.mutateAsync(local);
+  });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(useLocalJobs.getState().claims[local.id]?.proId).toBe(PRO_ID);
+  expect(fetchCount).toBe(0);
+});
+
+it('puts the Job back on the available list when the claim fails upstream', async () => {
+  signedInAsThePro();
+  const { result } = await renderHook(() => useClaimJob(), { wrapper });
+
+  await act(async () => {
+    await expect(
+      result.current.mutateAsync(anOpenJobOf(String(FIXTURE_FAILURE_ID))),
+    ).rejects.toThrow(`Fixture failure seeded for id ${FIXTURE_FAILURE_ID}`);
+  });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(useLocalJobs.getState().claims).toEqual({});
+});
+
+/**
+ * Requirement 10, at the seam that enforces it. The UI has no button on a Job someone already holds, but
+ * the rule is the store's: whichever screen, Role or race arrives at an already-claimed Job, the claim is
+ * refused with the sentence a screen can show and **nothing is sent**.
+ */
+it("refuses a Job another Pro already holds, in the store's own words, and sends nothing", async () => {
+  signedInAsThePro();
+  const taken = anOpenJobOf(A_CLIENT_JOB.id);
+  useLocalJobs.getState().claimJob(taken, 'pro-someone-else');
+  const { result } = await renderHook(() => useClaimJob(), { wrapper });
+
+  await act(async () => {
+    await expect(result.current.mutateAsync(taken)).rejects.toThrow('That job is no longer open');
+  });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(useLocalJobs.getState().claims[A_CLIENT_JOB.id]?.proId).toBe('pro-someone-else');
+  expect(fetchCount).toBe(0);
+});
+
+/**
+ * And the half that makes the claim felt everywhere at once: the row leaves available jobs without the list
+ * being asked for again. `select` re-runs off the new store value, `availableScope` reads a status the claim
+ * has just changed, and the row is gone — which is requirement 12 for this verb.
+ *
+ * Then the invalidation's own refetch lands, and the row is **still** gone. That is `ADR 0002`'s invariant
+ * rather than a second phrasing of the first assertion: the server answers with the todo exactly as present
+ * as it ever was, and the overlay drops it again on the way through `select`.
+ *
+ * The wait on `isFetching` is also what lets Jest exit. A refetch still in flight when a test ends holds the
+ * process open and `queryClient.clear()` does not settle it — `#9` lost time to that and wrote it down.
+ */
+it('drops the claimed row out of available jobs, and keeps it out through the refetch', async () => {
+  signedInAsThePro();
+  const list = await renderHook(() => useAvailableJobs(), { wrapper });
+  await waitFor(() => expect(list.result.current.isSuccess).toBe(true));
+  const open = list.result.current.data?.[0] as Job;
+  const claim = await renderHook(() => useClaimJob(), { wrapper });
+
+  await act(async () => {
+    await claim.result.current.mutateAsync(open);
+  });
+
+  await waitFor(() => expect(ids(list.result.current.data)).not.toContain(open.id));
+
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  expect(ids(list.result.current.data)).not.toContain(open.id);
 });
