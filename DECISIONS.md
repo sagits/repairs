@@ -321,3 +321,77 @@ hit. `lint` needs nothing, because each package lints itself.
 
 A stale green is worse than a red, and this one would have hidden a broken `packages/` change in
 every ticket from here on.
+
+## A cold deep link is dropped, so the guard's spec opens the link against a running app
+
+`PRD.md:629` promises that a deep link to `/mine` in a Client app "lands on My Jobs, not a crash",
+and `RoleGuard` delivers it — but the obvious way to drive that in Detox,
+`device.launchApp({ newInstance: true, url: 'repairs:///mine' })`, **does not deliver the URL at all**
+on this stack. Measured on `iPhone 16-Detox`: a cold launch with a `url` lands on `/` for every route,
+guarded or not, with both `repairs://mine` and `repairs:///mine`, and `repairs` is genuinely registered
+in the generated `Info.plist`. It is not the hydration gate either — removing the gate entirely changes
+nothing — so it belongs with the warning in `docs/research/stack-verification.md` that Detox's tested
+window stops at React Native 0.84 and Expo support is community-driven.
+
+`device.openURL` against the running app works, both spellings, first time. That is also the deep link
+iOS actually delivers in the case the requirement is about — someone taps a link while the app is in
+the background — so the spec uses it and the cold path is left recorded rather than worked around.
+
+**The more useful half of this entry: the first two drafts of that spec were green and proved nothing.**
+A link the app ignores leaves you on `/`, and `/` is also where the redirect lands, so an assertion that
+only checks the destination passes whether or not the guard — or the link — exists at all. The spec now
+opens the *same* link as the Pro first, and reaching the claimed-jobs screen is what proves the link
+arrives; and the Client's redirect is driven from Settings, so leaving Settings is what proves the
+navigation happened. Both assertions were vacuous before, and both failed honestly once rewritten.
+Any later spec that asserts a redirect owes the same two things: a case where the link is honoured, and
+a starting point that is not the destination.
+
+## `useLocalJobs` lands as a skeleton: `#6` owns its lifetime, `#4` owns its contents
+
+Settings needs the local job store before the data layer defines it. The two tickets want different
+things from it and they do not overlap: `#4` — "The job data layer" — owns the three fields' element
+types and every action that writes them, and `#6` owns the one property the data layer has no opinion
+about, which is how long the store lives. Switching Role and logging out rewrite `useSession` and must
+leave this store untouched, because that is what makes a Job posted as a Client visible to the Pro a
+switch later; `clear` is the only way back to a clean slate, and Settings makes you confirm it.
+
+So `packages/stores/useLocalJobs.ts` ships with `PRD.md`'s three field names, `clear`, and the persist
+config — and with `created` and `claims` holding `unknown`, because inventing a second `Job` type here
+would be a shape to reconcile rather than a head start. `deleted` is already final: a cancelled Job is
+nothing but its id. The test beside it asserts only the lifetime. **Expect a conflict in this file and
+in `packages/stores/src/index.ts` when `#4` merges; keep `#4`'s types and actions, keep `clear`.**
+
+## The Role lock arrives as context now, and only Settings reads it yet
+
+`PRD.md:641` has `AppProviders` do two things with `appRole`: hide the Role switcher, and pin the Role
+so the role-locked apps need no picker of their own. Only the first is here, because `#6`'s criterion is
+that Switch Role is present in the shared app alone, and the second has no app to be true of until `#13`
+builds `apps/client` and `apps/pro`.
+
+`appRole` is therefore a prop on `AppProviders` with an `AppRole` context behind it, defaulting to
+`'both'`. The default is a decision and not a convenience: a component rendered without the provider
+should behave as the shared app, because `apps/both` is the build that has nothing to declare, and a
+missing provider must not silently hide a feature the build has. `apps/both/app/_layout.tsx` passes
+`appRole="both"` explicitly all the same — it is the one line `#13`'s parity script will diff.
+
+## The destructive confirm is in the app, not in `Alert.alert`
+
+`Alert.alert` is two lines and would cost more than it saves. A system alert is a separate element tree:
+React Native Testing Library cannot see it without mocking the module, and on iOS Detox reaches it only
+through system-level matchers, which is exactly the kind of matching that already cost this repo a day
+over `Simulator.app`. The in-app confirm is the same two taps, it is styled like the rest of the screen,
+and both test seams drive it directly with nothing stubbed.
+
+It is also the pattern the rest of the app needs: `PRD.md:704` has cancelling a Job ask for confirmation
+too. Settings is where it gets written first, and it is deliberately local to the screen — one in-app
+confirm is not yet a component, and the second one is what will say what the shared shape should be.
+
+## `RoleGuard` is used once, not twice, because the second route it is for does not exist yet
+
+`PRD.md:629` says "one component, used twice", and names `/mine` for a Client and — implicitly, by being
+Client-only — `job/new.tsx` for a Pro. Only `/mine` exists today, so the guard has one caller: it wraps
+`ClaimedJobsScreen`, in `packages/features`, rather than the route shell, because an `apps/*/app/` file
+is a re-export and nothing else and `#13`'s parity script is about to enforce that.
+
+The second use arrives with `#8` — "A Client posts a job" — and it is a one-line wrap. Recorded so the
+count reads as pending rather than as a requirement half-met.
