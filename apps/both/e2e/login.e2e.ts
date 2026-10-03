@@ -3,9 +3,9 @@
  * Role is read back off storage before anything renders, so the picker is not merely replaced on the
  * way through — it never appears at all.
  *
- * The two sign-ins start from `delete: true`, which reinstalls and so wipes storage. That is the only
- * way back to a signed-out app until Settings grows a log out, and it is what makes each sign-in a
- * genuinely cold one rather than a continuation of the test above it.
+ * The two sign-ins start from `delete: true`, which reinstalls and so wipes storage. Settings has a log
+ * out now, and `settings.e2e.ts` drives it — but a reinstall is still what makes each sign-in here a
+ * genuinely cold one rather than a continuation of the test above it, which is the point.
  *
  * Detox's `expect` is imported under a different name because Jest's global `expect` is also in scope
  * here and the two are not interchangeable. The tabs are matched by `testID` rather than by their
@@ -68,8 +68,6 @@ describe('login', () => {
 
     await element(by.id('tab-settings')).tap();
 
-    await waitFor(element(by.text('Your profile, switching Role and logging out will live here.')))
-      .toBeVisible()
-      .withTimeout(VISIBLE_WITHIN);
+    await waitFor(element(by.text('Signed in as Pro'))).toBeVisible().withTimeout(VISIBLE_WITHIN);
   });
 });
