@@ -9,7 +9,7 @@ import '../global.css';
 
 export default function RootLayout() {
   return (
-    <AppProviders>
+    <AppProviders appRole="both">
       <Stack screenOptions={{ headerShown: false }} />
     </AppProviders>
   );

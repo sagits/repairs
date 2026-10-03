@@ -12,3 +12,11 @@ export type User = {
   name: string;
   email: string;
 };
+
+/**
+ * Which Roles a *build* offers, as opposed to which Role you are signed in as. Repairs is `'both'`
+ * and shows a Role picker and a Role switcher; Repairs Client and Repairs Pro are locked to one
+ * Role and show neither. It is a build-time constant per app, handed to `AppProviders` rather than
+ * persisted — a persisted copy of a constant is only a stale value waiting to outlive a change to it.
+ */
+export type AppRole = Role | 'both';
