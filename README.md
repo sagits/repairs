@@ -126,10 +126,13 @@ pnpm lint
 `test` and `typecheck` need nothing beyond Node and the install. The device suite does:
 
 ```sh
-pnpm e2e:build    # expo prebuild + detox build — needs Xcode, CocoaPods and cmake
-pnpm e2e:metro    # optional, in its own terminal
+pnpm e2e:build                                 # expo prebuild + detox build — needs Xcode, CocoaPods and cmake
+pnpm --filter @repairs/both e2e:metro          # optional, in its own terminal
 pnpm e2e:test
 ```
+
+The Metro one is the only command here that has no root alias, on purpose: it is a persistent task
+that wants its own terminal, and `turbo run` is not what should own it.
 
 Detox runs against the `iPhone 16-Detox` simulator in Debug, which loads its JS from Metro.
 `pnpm e2e:test` starts a Metro if none is serving and kills only one it started, so an `e2e:metro`
