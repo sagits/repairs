@@ -139,11 +139,28 @@ hazards and asked for the outcome either way.
   around.
 - **`iPhone 16-Detox` was matched by name, not created.** The device was already on the machine, as
   that ticket said, and `.detoxrc.js` targets that name.
-- **The real one: Xcode 27 ships no launchable `Simulator.app`.** Detox tries `open -a Simulator`,
-  fails with "Unable to find application named 'Simulator'", retries for ~25s and then runs the
-  suite anyway — so the error is loud, misleading and harmless. `headless: true` on the device skips
-  the detour and takes a single spec from 62s to 20s. The simulator boots through `simctl` either
-  way; the only thing lost is the window.
+- **The real one: Xcode 27 ships no launchable `Simulator.app`.** The bundle is simply absent —
+  LaunchServices still has a record pointing at a path under `Xcode.app` that no longer exists, and
+  `DeviceHub.app` is what shows a simulator now. So Detox's `open -a Simulator` fails with "Unable
+  to find application named 'Simulator'" and the suite runs anyway. `headless: true` suppresses the
+  attempt, and that is **all** it buys: a misleading error message, not time. See below.
+
+## `headless: true` costs nothing, and a run can still be watched
+
+Correcting this entry's own first draft, which claimed `headless: true` took a spec from 62s to 20s.
+It does not. Detox reads the flag in exactly one place — `_openSimulatorApp` in
+`node_modules/detox/src/devices/common/drivers/ios/tools/AppleSimUtils.js` — and that call is made
+with `retries: 0`, so it fails in milliseconds. The 62s run was a cold device boot plus a first
+install; the 20s run reused the device Detox had left booted. The flag was never the variable.
+
+What it does buy is the error message not appearing, which is worth having, because the message
+advises `sudo xcode-select -s /Applications/Xcode.app` and that is not the problem here.
+
+**To watch a run, boot the device first.** `boot()` returns early when the device is already
+`Booted`, before the `headless` check is reached, so a pre-booted device never attempts the open at
+all — the flag is inert. Boot `iPhone 16-Detox`, open it in `DeviceHub.app`, and `pnpm e2e:test`
+drives the device on screen with the committed config untouched. The window is only ever lost on the
+cold-boot path.
 
 ## The New Architecture and Detox 20.51 on RN 0.86 need no workaround
 
