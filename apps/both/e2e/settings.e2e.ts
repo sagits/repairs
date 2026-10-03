@@ -37,7 +37,13 @@ import { by, device, element, expect as expectElement, waitFor } from 'detox';
 const VISIBLE_WITHIN = 60_000;
 
 const CLAIMED_JOBS = 'The jobs you have claimed will appear here.';
-const POSTED_JOBS = 'The jobs you have posted will appear here.';
+
+/**
+ * Posted jobs is a real list now, so there is no placeholder sentence left to wait on. The `+` in its
+ * header is what this spec means by "the Client's list": it draws, it is there before the request has
+ * answered, and no other Role's screen has one. `client-jobs.e2e.ts` owns the contents.
+ */
+const POSTED_JOBS_HEADER = 'post-job';
 
 const PRO_ONLY_ROUTE = 'repairs:///mine';
 
@@ -89,7 +95,7 @@ describe('settings', () => {
 
     await element(by.id('tab-index')).tap();
 
-    await waitForText(POSTED_JOBS);
+    await waitForVisible(POSTED_JOBS_HEADER);
   });
 
   it('redirects the same link for the Role that cannot reach it, rather than crashing on it', async () => {
@@ -103,7 +109,7 @@ describe('settings', () => {
 
     await device.openURL({ url: PRO_ONLY_ROUTE });
 
-    await waitForText(POSTED_JOBS);
+    await waitForVisible(POSTED_JOBS_HEADER);
     await expectElement(element(by.text(CLAIMED_JOBS))).not.toExist();
     await expectElement(element(by.id('tab-mine'))).not.toExist();
   });

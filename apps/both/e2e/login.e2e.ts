@@ -15,6 +15,10 @@
  * The picker is asserted through its two buttons rather than through a container around them:
  * `toBeVisible` does not hold for a transparent layout view even when it is plainly on screen, which
  * `DECISIONS.md` records. Whatever a spec waits on here, let it be something that draws.
+ *
+ * "Signed in as a Client" is asserted through the `+` in the posted-jobs header rather than through the
+ * list's contents. The list is a real request now, so its rows arrive after a skeleton and depend on the
+ * fixture dataset; the `+` is on screen from the first frame and belongs to no other Role.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
 
@@ -52,7 +56,7 @@ describe('login', () => {
 
     await waitForVisible('tab-bar');
     await expectElement(element(by.id('continue-as-client'))).not.toExist();
-    await expectElement(element(by.text('The jobs you have posted will appear here.'))).toBeVisible();
+    await expectElement(element(by.id('post-job'))).toBeVisible();
   });
 
   it('signs a Pro in to their three tabs, and the tabs navigate', async () => {
