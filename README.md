@@ -20,6 +20,8 @@
 - **Turborepo** monorepo (pnpm workspaces)
 - **Detox** — end-to-end tests, one spec per feature
 - **Jest + React Native Testing Library** — integration tests at the state and interaction seams
+- **In-memory fixture server** — Used to fake some API responses like status 500 or an empty list on
+  demand, which the real API cannot.
 - **Matt Pocock** — Set of skills for AI assisted development using specs. It can turn a spec or product requirement document (like PRD.md) into several tickets that can be worked on by agents using TDD and e2e (if specified on the spec like I did)
 - **Git worktree** - I used git worktrees to be able to work on multiple PRs at the same time
 - **PRD.md** - Product requirement document that I created with all the technical decisions and the architecture that I want to use on this project (including following the Turno design system)
