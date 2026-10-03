@@ -1,17 +1,28 @@
 # Repairs
 
-A repair-jobs app where two kinds of people share one app: a **Client** posts repair jobs and tracks
-them, a **Pro** picks them up. There is no sign up and no credentials — you sign in by picking a Role,
-and that Role is the whole of your identity, which is what makes both sides reachable on one device
-against one dataset.
+- A repair-jobs app where **two kinds of users share the same app** and see different things
+- Client user: Posts repair jobs and tracks them
+- Pro user: Picks up jobs and completes them
+- Monorepo with shared packages to share the same screens, components, and logic between multiple apps (so we can split the original app into 2 different apps in the future, and share code with any React web projects)
 
-## The shape of it
+## Architecture
 
-A pnpm workspace driven by turbo, where `apps/both` is a thin shell and everything that could be
-shared is. The app directory holds Expo Router routes and almost nothing else: each route file names
-a screen from `packages/features` and, where only one Role may reach it, wraps it in a guard. The
-work lives in the packages, so a second app target would be routes over the same screens rather than
-a second copy of them.
+- **Expo** (SDK 57, the current latest — managed workflow) + **Expo Router** (file-based routing,
+  typed routes)
+- **TypeScript** (strict)
+- **NativeWind** + React Native primitives for layout — no component library
+- **TanStack Query v5** — every request, and its cache
+- **Zustand** (+ `persist`) — session, the local job store, form drafts
+- **React Hook Form** + **Zod** (`@hookform/resolvers/zod`) — form state and validation, and the
+  schema at the API boundary
+- **React Native Web** — the same source ships to the browser, deployable to Vercel
+- **Turborepo** monorepo (pnpm workspaces)
+- **Detox** — end-to-end tests, one spec per feature
+- **Jest + React Native Testing Library** — integration tests at the state and interaction seams
+- **Matt Pocock** — Set of skills for AI assisted development using specs. It can turn a spec or product requirement document (like PRD.md) into several tickets that can be worked on by agents using TDD and e2e (if specified on the spec like I did)
+- **PRD.md** - Product requirement document that I created with all the technical decisions and the architecture that I want to use on this project (including following the Turno design system)
+
+The API is **DummyJSON**, public and free.
 
 | Package | What is in it |
 | --- | --- |
@@ -24,49 +35,6 @@ a second copy of them.
 | `@repairs/testing` | The fixture server and the Jest seam that installs it. |
 
 Styling is NativeWind, so the screens are Tailwind classes rather than a parallel stylesheet.
-
-The query cache holds only what the server said. Anything we know that it cannot — a job posted
-locally, a job cancelled — lives in the local job store and is laid over each response at read time,
-which is `docs/adr/0002` and is why a posted job appears in the list with no refresh and a cancelled
-one stays gone through a refetch and through a restart.
-
-## What it does
-
-**Signing in** is the Role picker, and the Role is persisted, so a full restart comes back signed in
-with no flash of the picker on the way.
-
-**The tabs are derived from the Role** by one custom tab bar: a Client gets My Jobs and Settings, a
-Pro gets Available, My Jobs and Settings. `index` is the one route both Roles reach under different
-names.
-
-**Settings** shows the person behind the current Role, and the ways out of being them: Switch Role,
-Log out, and a confirmed Clear local job data. Neither exit touches the local job data, because the
-session is who you are and the local store is what happened — clearing it is the third action, and it
-asks first.
-
-**The Client's posted-jobs list** renders all four of its states: the loaded list, a skeleton in front
-of the first load, an empty state that offers the one thing to do about it, and a failure shown above
-whatever list it already had, with Retry.
-
-**Posting a job** is two fields and a schema that is also the resolver, so the type, the validation
-and the message under the field cannot drift apart. What was typed survives backing out of the screen,
-and the posted job appears at the top of the list as open.
-
-**The job detail screen** offers the actions the current Role has and omits the ones it does not — a
-Client can cancel their own job while it is still open, and once a Pro holds it the button is gone and
-a line says why. The cancel is confirmed in the app rather than through `Alert.alert`, so both test
-seams drive it with nothing stubbed.
-
-## The fixture server
-
-With `EXPO_PUBLIC_API=fixtures`, an in-memory server shaped exactly like `fetch` answers all six
-endpoints the app uses off a fixed dataset. Being a `fetch` rather than a client is the point:
-everything above it exercises the same code either way instead of branching.
-
-It is deterministic on purpose. The delay is a flat 600ms, never a window — screens hold their
-skeleton a minimum of 300ms, and the daylight either side of 600 is what turns "skeleton, then
-content" from a coin flip into a fact. The failure case is one seeded id rather than a `failNext()`
-switch, so a test reaches the error path by asking for it, with no setup call and no mutable state.
 
 ## Running it
 
