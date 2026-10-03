@@ -19,66 +19,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Controller, useForm, type Control } from 'react-hook-form';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useForm } from 'react-hook-form';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useCreateJob } from '@repairs/api';
 import { useNewJobDraft } from '@repairs/stores';
-import { colors, HeaderBand, Screen } from '@repairs/ui';
+import { colors, FormField, HeaderBand, Screen } from '@repairs/ui';
 import { NewJobSchema, type NewJobInput } from '@repairs/types';
 import { RoleGuard } from './RoleGuard';
-
-/**
- * One field: its label, its input and the line that carries its message. It is a local component rather
- * than one in `@repairs/ui` because this is the only form in the app and the only one any ticket on the
- * board adds — a shared field component would be a design-system dependency on React Hook Form with a
- * single consumer. `DECISIONS.md` records that, and where it moves if a second form ever arrives.
- *
- * `Controller` rather than `register`, because React Native has no DOM refs for `register` to attach to.
- */
-function FormField({
-  control,
-  name,
-  label,
-  placeholder,
-  multiline,
-}: {
-  control: Control<NewJobInput>;
-  name: keyof NewJobInput;
-  label: string;
-  placeholder: string;
-  multiline?: boolean;
-}) {
-  return (
-    <Controller
-      control={control}
-      name={name}
-      render={({ field, fieldState }) => (
-        <View className="gap-2">
-          <Text className="text-sm font-semibold text-ink">{label}</Text>
-          <TextInput
-            testID={`new-job-${name}`}
-            accessibilityLabel={label}
-            value={field.value ?? ''}
-            onChangeText={field.onChange}
-            onBlur={field.onBlur}
-            placeholder={placeholder}
-            placeholderTextColor={colors.inkMuted}
-            multiline={multiline}
-            className={`rounded-card border bg-surface px-4 py-3 text-base text-ink ${
-              fieldState.error ? 'border-danger' : 'border-border'
-            } ${multiline ? 'h-28' : ''}`}
-            style={multiline ? { textAlignVertical: 'top' } : undefined}
-          />
-          {fieldState.error ? (
-            <Text testID={`new-job-${name}-error`} className="text-sm leading-5 text-danger">
-              {fieldState.error.message}
-            </Text>
-          ) : null}
-        </View>
-      )}
-    />
-  );
-}
 
 /**
  * The way back out, and the reason the band has an `action` slot. The Stack is `headerShown: false`, so
@@ -175,12 +122,14 @@ function NewJobForm() {
         <FormField
           control={control}
           name="title"
+          testID="new-job-title"
           label="Title"
           placeholder="What needs repairing?"
         />
         <FormField
           control={control}
           name="description"
+          testID="new-job-description"
           label="Description"
           placeholder="Anything a Pro should know before they arrive"
           multiline

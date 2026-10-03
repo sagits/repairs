@@ -16,6 +16,7 @@
   "peerDependencies": {
     "nativewind": "*",
     "react": "*",
+    "react-hook-form": "*",
     "react-native": "*"
   }
 }
