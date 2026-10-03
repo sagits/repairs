@@ -1,5 +1,11 @@
 {
   "extends": "@repairs/config/tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "expo-router": ["./node_modules/expo-router"],
+      "expo-router/*": ["./node_modules/expo-router/*"]
+    }
+  },
   "include": [
     "app",
     "e2e",
