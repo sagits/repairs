@@ -25,7 +25,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useCancelJob, useClaimJob, useCompleteJob, useJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
-import { colors, ErrorCard, HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import { colors, ErrorCard, GlyphFrame, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job, JobStatus, User } from '@repairs/types';
 import { ActionButton } from './JobActions';
 import { asDay, CLAIM_FAILED, COMPLETE_FAILED, proName } from './jobText';
@@ -91,9 +91,9 @@ function JobDetailSkeleton() {
 function JobNotFound() {
   return (
     <View testID="job-not-found" className="items-center px-5 py-16">
-      <View className="h-20 w-20 items-center justify-center rounded-card border-2 border-illustration">
+      <GlyphFrame>
         <Text className="text-3xl font-semibold text-illustration">?</Text>
-      </View>
+      </GlyphFrame>
       <Text className="mt-5 text-lg font-semibold text-ink">No such job</Text>
       <Text className="mt-1 text-center text-base leading-6 text-slate">
         It may have been cancelled, or the link may be out of date.
@@ -265,9 +265,29 @@ export function JobDetailScreen() {
   const complete = useCompleteJob();
   const claiming = claim.isPending;
   const completing = complete.isPending;
+  const isPro = user?.role === 'pro';
 
   /** Whether the Pro reading this is the one holding it, which is the only question Mark as done turns on. */
   const holdsIt = job?.proId === user?.id;
+
+  /**
+   * The Pro's two actions, as two conditions rather than as a ternary nested inside the JSX. **Claim on an
+   * open Job, Mark as done on one they hold, and nothing at all on one somebody else holds or one already
+   * done.** Not a disabled button and not a line of explanation — a Pro reading a Job another Pro took has no
+   * relationship to it, and an empty space is the honest account of that. The store refuses both verbs in
+   * those cases anyway; this is the screen agreeing with it rather than the thing enforcing it.
+   *
+   * `|| claiming` and `|| completing` are what keep each button on screen through its own request. Without
+   * them the status flips on the optimistic write and the button vanishes mid-flight, so the spinner the
+   * states table asks for would never be seen and a failure would have nothing to roll back to.
+   *
+   * **`!claimable` on the second is the precedence, and it is load-bearing rather than tidy**: mid-claim both
+   * conditions are true at once — `claiming` is still set while the optimistic write has already made the Job
+   * this Pro's claimed one — and without it the screen would grow a second button underneath the spinning
+   * first one.
+   */
+  const claimable = job?.status === 'open' || claiming;
+  const completable = !claimable && ((job?.status === 'claimed' && holdsIt) || completing);
 
   return (
     <Screen>
@@ -306,39 +326,23 @@ export function JobDetailScreen() {
               </Text>
             )
           ) : null}
-          {/**
-           * The Pro's side of the same branch: **Claim on an open Job, Mark as done on one they hold, and
-           * nothing at all on one somebody else holds or one already done.** Not a disabled button and not a
-           * line of explanation — a Pro reading a Job another Pro took has no relationship to it, and an empty
-           * space is the honest account of that. The store refuses both verbs in those cases anyway; this is
-           * the screen agreeing with it rather than the thing enforcing it.
-           *
-           * `|| claiming` and `|| completing` are what keep each button on screen through its own request.
-           * Without them the status flips on the optimistic write and the button vanishes mid-flight, so the
-           * spinner the states table asks for would never be seen and a failure would have nothing to roll
-           * back to.
-           */}
-          {job && user?.role === 'pro'
-            ? job.status === 'open' || claiming
-              ? (
-                  <ActionButton
-                    testID="claim-job"
-                    label="Claim"
-                    pending={claiming}
-                    onPress={() => claim.mutate(job)}
-                  />
-                )
-              : (job.status === 'claimed' && holdsIt) || completing
-                ? (
-                    <ActionButton
-                      testID="complete-job"
-                      label="Mark as done"
-                      pending={completing}
-                      onPress={() => complete.mutate(job)}
-                    />
-                  )
-                : null
-            : null}
+          {/* The Pro's side of the same branch; `claimable` and `completable` above carry the reasoning. */}
+          {job && isPro && claimable ? (
+            <ActionButton
+              testID="claim-job"
+              label="Claim"
+              pending={claiming}
+              onPress={() => claim.mutate(job)}
+            />
+          ) : null}
+          {job && isPro && completable ? (
+            <ActionButton
+              testID="complete-job"
+              label="Mark as done"
+              pending={completing}
+              onPress={() => complete.mutate(job)}
+            />
+          ) : null}
         </ScrollView>
       )}
     </Screen>

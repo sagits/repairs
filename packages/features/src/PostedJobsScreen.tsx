@@ -6,7 +6,7 @@
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useClientJobs } from '@repairs/api';
-import { colors, ErrorCard, HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import { colors, ErrorCard, GlyphFrame, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job } from '@repairs/types';
 import { asDay, proName } from './jobText';
 import { JobListSkeleton, useSkeletonHold } from './listSkeleton';
@@ -47,22 +47,19 @@ function PostedJobRow({ job, onOpen }: { job: Job; onOpen: () => void }) {
 }
 
 /**
- * Nothing posted yet, which is the screen that has to explain the app rather than report a count. The
- * illustration is drawn from views because there is no icon font installed — `@expo/vector-icons` is not
- * a dependency, which `DECISIONS.md` records — and three flat `illustration`-grey bars inside a rounded
- * outline read as a list with nothing on it, which is exactly what it is.
+ * Nothing posted yet, which is the screen that has to explain the app rather than report a count. Three
+ * flat `illustration`-grey bars inside a `GlyphFrame` read as a list with nothing on it, which is exactly
+ * what it is — and `GlyphFrame` is where the reason this is drawn by hand rather than set in an icon font
+ * is written down.
  */
 function EmptyPostedJobs({ onPostJob }: { onPostJob: () => void }) {
   return (
     <View className="items-center px-5 py-16">
-      <View
-        testID="posted-jobs-empty-glyph"
-        className="h-20 w-20 items-center justify-center gap-1.5 rounded-card border-2 border-illustration"
-      >
+      <GlyphFrame testID="posted-jobs-empty-glyph">
         <View className="h-1.5 w-9 rounded bg-illustration" />
         <View className="h-1.5 w-9 rounded bg-illustration" />
         <View className="h-1.5 w-5 rounded bg-illustration" />
-      </View>
+      </GlyphFrame>
       <Text className="mt-5 text-lg font-semibold text-ink">No jobs posted yet</Text>
       <Text className="mt-1 text-center text-base leading-6 text-slate">
         Post a repair job and a Pro can claim it.

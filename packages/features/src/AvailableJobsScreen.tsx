@@ -21,7 +21,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } fr
 import { useRouter } from 'expo-router';
 import { useAvailableJobs, useClaimJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
-import { colors, ErrorCard, HeaderBand, Screen } from '@repairs/ui';
+import { colors, ErrorCard, GlyphFrame, HeaderBand, Screen } from '@repairs/ui';
 import type { Job, User } from '@repairs/types';
 import { ActionButton } from './JobActions';
 import { CLAIM_FAILED } from './jobText';
@@ -77,19 +77,15 @@ function AvailableJobRow({
 
 /**
  * Nothing open anywhere, which for this list means every Job in the dataset has been claimed or finished.
- * There is no call to action: a Pro cannot post work, so the honest thing is to say so and stop. The glyph
- * is drawn from views because there is no icon font in this build.
+ * There is no call to action: a Pro cannot post work, so the honest thing is to say so and stop.
  */
 function NoAvailableJobs() {
   return (
     <View className="items-center px-5 py-16">
-      <View
-        testID="available-jobs-empty-glyph"
-        className="h-20 w-20 items-center justify-center gap-1.5 rounded-card border-2 border-illustration"
-      >
+      <GlyphFrame testID="available-jobs-empty-glyph">
         <View className="h-1.5 w-9 rounded bg-illustration" />
         <View className="h-1.5 w-5 rounded bg-illustration" />
-      </View>
+      </GlyphFrame>
       <Text className="mt-5 text-lg font-semibold text-ink">No open jobs right now</Text>
       <Text className="mt-1 text-center text-base leading-6 text-slate">
         Every job has been claimed. Pull down to check again.

@@ -30,12 +30,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { FormField, Screen } from '@repairs/ui';
 import { useSession } from '@repairs/stores';
-import { LoginSchema, type LoginInput, type Role } from '@repairs/types';
-
-const ROLES: { role: Role; label: string }[] = [
-  { role: 'client', label: 'Client' },
-  { role: 'pro', label: 'Pro' },
-];
+import { LoginSchema, ROLES, ROLE_LABELS, type LoginInput, type Role } from '@repairs/types';
 
 /**
  * Which person the valid-looking credentials sign you in as. It is the one control on the screen that
@@ -47,21 +42,21 @@ function RoleSwitch({ role, onChange }: { role: Role; onChange: (role: Role) => 
       <Text className="text-sm font-semibold text-ink">Sign in as</Text>
       <View className="flex-row gap-2 rounded-card border border-border bg-surface p-1">
         {ROLES.map((option) => {
-          const selected = option.role === role;
+          const selected = option === role;
           return (
             <Pressable
-              key={option.role}
-              testID={`role-${option.role}`}
+              key={option}
+              testID={`role-${option}`}
               accessibilityRole="button"
-              accessibilityLabel={option.label}
+              accessibilityLabel={ROLE_LABELS[option]}
               accessibilityState={{ selected }}
               className={`flex-1 items-center rounded-card py-3 ${selected ? 'bg-primaryMuted' : ''}`}
-              onPress={() => onChange(option.role)}
+              onPress={() => onChange(option)}
             >
               <Text
                 className={`text-base font-semibold ${selected ? 'text-primaryInk' : 'text-inkMuted'}`}
               >
-                {option.label}
+                {ROLE_LABELS[option]}
               </Text>
             </Pressable>
           );

@@ -24,7 +24,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { overlayClaim, useCompleteJob } from '@repairs/api';
 import { useLocalJobs, useSession } from '@repairs/stores';
-import { ErrorCard, HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import { ErrorCard, GlyphFrame, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job } from '@repairs/types';
 import { ActionButton } from './JobActions';
 import { asDay, COMPLETE_FAILED } from './jobText';
@@ -129,13 +129,10 @@ function Group({
 function NothingClaimed() {
   return (
     <View className="items-center px-5 py-16">
-      <View
-        testID="claimed-jobs-empty-glyph"
-        className="h-20 w-20 items-center justify-center gap-1.5 rounded-card border-2 border-illustration"
-      >
+      <GlyphFrame testID="claimed-jobs-empty-glyph">
         <View className="h-1.5 w-9 rounded bg-illustration" />
         <View className="h-1.5 w-5 rounded bg-illustration" />
-      </View>
+      </GlyphFrame>
       <Text className="mt-5 text-lg font-semibold text-ink">Nothing claimed yet</Text>
       <Text className="mt-1 text-center text-base leading-6 text-slate">
         Claim a job from Available and it appears here.
