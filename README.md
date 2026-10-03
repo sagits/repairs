@@ -4,6 +4,7 @@
 - Client user: Posts repair jobs and tracks them
 - Pro user: Picks up jobs and completes them
 - Monorepo with shared packages to share the same screens, components, and logic between multiple apps (so we can split the original app into 2 different apps in the future, and share code with any React web projects)
+- API requests done with TanStack react Query (to dummyjson.com/todos) and augmented with local Zustand store saved data to save the result from the POST/PUT/DELETE requests and still have the app calling a normal API with TanStack React Query (because using React Query for requests/requests cache and zustand/redux for what needs to be persisted/changed locally is what apps usually do)
 
 ## Architecture
 
