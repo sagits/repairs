@@ -1,5 +1,5 @@
 {
-  "name": "@repairs/features",
+  "name": "@repairs/api",
   "version": "0.0.0",
   "private": true,
   "main": "src/index.ts",
@@ -7,16 +7,15 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@repairs/api": "workspace:*",
     "@repairs/stores": "workspace:*",
-    "@repairs/types": "workspace:*",
-    "@repairs/ui": "workspace:*"
+    "@repairs/types": "workspace:*"
   },
   "peerDependencies": {
     "@tanstack/react-query": "*",
-    "expo-router": "*",
-    "nativewind": "*",
     "react": "*",
-    "react-native": "*"
+    "zod": "*"
+  },
+  "devDependencies": {
+    "@repairs/testing": "workspace:*"
   }
 }

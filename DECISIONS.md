@@ -322,6 +322,104 @@ hit. `lint` needs nothing, because each package lints itself.
 A stale green is worse than a red, and this one would have hidden a broken `packages/` change in
 every ticket from here on.
 
+## A `tsconfig.json` `paths` entry is also a Jest `moduleNameMapper` entry, and the two new packages need neither
+
+The entry above — "a `packages/*` file reaches the Expo SDK through resolver config" — says one `paths`
+entry per SDK package a `packages/*` file imports. `zod` and `@tanstack/react-query` were added that way
+first, and it broke every test in `packages/`: `jest-expo` reads the app's `tsconfig.json` `paths` and
+turns each one into a `moduleNameMapper` rule, so a `paths` entry is not a TypeScript-only hint. The
+mapped target was `apps/both/node_modules/zod`, which does not exist.
+
+It does not exist because **these two hoist to the workspace root and `expo-router` does not.** With
+`nodeLinker: hoisted`, pnpm symlinks a project's direct dependencies into its own `node_modules` only
+where it has to; `zod` and `@tanstack/react-query` landed in the root `node_modules`, which is already
+on the lookup path of every file under `packages/` — for TypeScript walking up, for Jest's
+`modulePaths`, for Metro's `nodeModulesPaths` and for ESLint's resolver. So no config entry is needed
+at all, and both were reverted.
+
+The rule that survives is narrower than the one above, and worth checking rather than assuming: **look
+where a new dependency actually landed before configuring anything for it.** `ls node_modules/<pkg>`
+against `ls apps/both/node_modules/<pkg>` is the whole investigation, and it answers all four tools at
+once.
+
+A workspace package is the exception, because it is symlinked per project and not hoisted:
+`@repairs/api`'s tests import `@repairs/testing`, so `@repairs/testing` is declared as a devDependency
+of `@repairs/api` rather than relied on through the app. One line, and no resolver config.
+
+## `renderHook` is async too, and a bare one needs `notifyOnChangeProps: 'all'`
+
+Two things about testing hooks, both of which present as the hook simply not working.
+
+`renderHook` is `await`ed, exactly like `render` — the entry above covers `render`, `rerender` and
+`unmount`, and this is the fourth. Without the await, `result` is `undefined` and every assertion fails
+on `Cannot read properties of undefined (reading 'current')`, which reads like a provider problem.
+
+The second one is subtler and cost longer. **TanStack Query only re-renders for properties a component
+read while rendering.** `renderHook(() => useAvailableJobs())` has no render body, so it touches none of
+them, and the observer concludes nothing is being watched: a page fetched by `fetchNextPage` lands in
+the cache and never reaches `result.current`, so the paging test reads page one forever while the
+returned promise plainly holds three pages. The test client sets `notifyOnChangeProps: 'all'`. This is a
+fact about the harness and not about the app — a real screen reads `data` and `isPending` as it renders,
+which is what makes the optimisation correct there and wrong here — so it is set on the test's client
+and not in `createQueryClient`.
+
+With that fixed, each page still has to be awaited to the render it causes before the next is asked
+for: `fetchNextPage` reads its page parameter off the render it was called from, so firing both at once
+asks twice for page two and quietly loads 34 rows where the test wanted 52.
+
+## The lifecycle guards are in the Local job store, in this ticket, not in the mutation tickets
+
+`PRD.md:779` puts them "at the store, not at the button", and the testing section lists them under
+`packages/stores/*` — but the acceptance criteria for this ticket only name the three persisted fields,
+so they could equally have arrived with the mutations that call them. They are here because there are
+three callers (claim, complete, cancel) across three later tickets, and a guard written once in the
+store is one place to be right rather than three places to agree.
+
+They **throw**, with the message a screen can show: `That job is no longer open`, `Only the Pro holding
+a job can complete it`, `That job is already done`, `You can only cancel a job you posted`, `A job can
+only be cancelled while it is open`. A guard that returned `false` into a variable nobody reads is not a
+guard, and every caller is a mutation whose `onMutate` has to fail loudly.
+
+One exception, which is deliberate: **cancelling an already-cancelled Job returns quietly.** The second
+press of a button is not a bug, and an error about a state the Job is already in is noise.
+
+Two smaller things settled along the way:
+
+- **`created` is never pruned, which is what makes `local-N` safe.** A cancellation is recorded in
+  `deleted` and the row stays; the overlay filters it out. So `created.length` only ever grows and is a
+  sound source of the next id. Pruning it would hand `local-2` to a second Job and point every stale
+  reference at the wrong one — and it would need a fourth persisted field to avoid.
+- **The PRD's "both directions" for the mapping is `toTodoBody`**, which the PRD tests but never names.
+  It is one function for both the create and the completion `PUT`, because the extra fields on a `PUT`
+  are the ones the record already holds.
+
+## The hydration gate waits for both stores, and the hook behind it is now shared
+
+`AppProviders` held the splash on `useSessionHydrated` alone. The Local job store is persisted too, and
+until it has been read back the overlay has nothing to lay on — so a Job a Pro holds renders as **open**
+for the first frames of a launch, on exactly the screen that exists to show otherwise. The gate now
+waits on both.
+
+`useSyncExternalStore` against `store.persist` is therefore written twice, which is where
+`packages/stores/src/hydration.ts` came from: `createHydrationHook(store)` builds the hook, and both
+stores call it. Converting `useSession` to it is a three-line change to a file that already worked, made
+because the second caller is what earns the helper — one caller would not have.
+
+The two hooks are called unconditionally and combined afterwards. `useSessionHydrated() &&
+useLocalJobsHydrated()` lints as a conditional hook and deserves to: `&&` skips the second call whenever
+the first is false, which is a different number of hooks per render.
+
+## `useClientJobs` is disabled rather than asserting a Client is signed in
+
+`PRD.md:420` reads `useSession((s) => s.user!.id)`. The non-null assertion is wrong twice over: `user`
+is `null` while signed out, and `id` is `number | string` because a Pro's id is a string we made up —
+so the assertion would hand a `'pro-1'` to an endpoint that wants a number.
+
+The hook reads the id only when it is a number, and the query is `enabled` on that. Signed out, or
+signed in as a Pro, it idles with no request rather than fetching `/todos/user/pro-1`. The Role switcher
+makes this reachable rather than theoretical: for a frame during a switch, a Client screen is mounted
+with a Pro's session.
+
 ## A cold deep link is dropped, so the guard's spec opens the link against a running app
 
 `PRD.md:629` promises that a deep link to `/mine` in a Client app "lands on My Jobs, not a crash",

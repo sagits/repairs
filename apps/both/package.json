@@ -16,10 +16,12 @@
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@repairs/api": "workspace:*",
     "@repairs/features": "workspace:*",
     "@repairs/stores": "workspace:*",
     "@repairs/types": "workspace:*",
     "@repairs/ui": "workspace:*",
+    "@tanstack/react-query": "^5.104.0",
     "expo": "57.0.26",
     "expo-constants": "~57.0.20",
     "expo-linking": "~57.0.11",
@@ -34,6 +36,7 @@
     "react-native-screens": "~4.26.2",
     "react-native-web": "^0.21.3",
     "react-native-worklets": "0.10.1",
+    "zod": "^4.6.5",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

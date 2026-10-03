@@ -11,7 +11,7 @@ import { render, screen, userEvent } from '@testing-library/react-native';
 import { useLocalJobs, useSession } from '@repairs/stores';
 import { AppRoleProvider } from './appRole';
 import { SettingsScreen } from './SettingsScreen';
-import type { AppRole } from '@repairs/types';
+import type { AppRole, Job } from '@repairs/types';
 
 const renderSettings = (appRole: AppRole = 'both') =>
   render(
@@ -20,7 +20,13 @@ const renderSettings = (appRole: AppRole = 'both') =>
     </AppRoleProvider>,
   );
 
-const aPostedJob = { id: 'local-1', title: 'Leaking tap' };
+const aPostedJob: Job = {
+  id: 'local-1',
+  title: 'Leaking tap',
+  status: 'open',
+  clientId: 13,
+  createdAt: '2026-01-01T09:00:00.000Z',
+};
 
 beforeEach(async () => {
   await AsyncStorage.clear();

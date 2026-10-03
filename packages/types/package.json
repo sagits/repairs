@@ -5,5 +5,8 @@
   "main": "src/index.ts",
   "scripts": {
     "lint": "eslint ."
+  },
+  "peerDependencies": {
+    "zod": "*"
   }
 }
