@@ -110,29 +110,38 @@ fi
 
 # `--reuse` keeps whatever is already installed, which must not survive a native rebuild: the binary
 # carries compiled native code, so a stale install presents as a missing JS export rather than as a
-# build problem — the note at the top of `.detoxrc.js` is about exactly this. A `.app` newer than the
-# stamp means a build has run since the last install, so this run installs and re-stamps. A *missing*
-# stamp counts the same, and that is the usual case after `pnpm e2e:build`, because `expo prebuild`
-# clears `ios/` and takes `ios/build` with it.
+# build problem — the note at the top of `.detoxrc.js` is about exactly this. So the stamp records
+# *which* binary was installed, as that binary's modification time, and this run reinstalls whenever the
+# binary on disk is not that one. A *missing* stamp counts the same, and that is the usual case after
+# `pnpm e2e:build`, because `expo prebuild` clears `ios/` and takes `ios/build` with it.
 #
-# `reuse` is one word or the empty string rather than an array, because `/bin/bash` here is 3.2, where
-# expanding an *empty* array under `set -u` is an unbound-variable error — which would have aborted
-# precisely the fresh-install path this is for. An empty scalar is set, so it expands to nothing, and
-# the expansion is deliberately unquoted for that reason.
+# **The comparison is equality, not "newer than".** `[ "$binary" -nt "$stamp" ]` reads better and has a
+# hole: `/bin/bash` here is 3.2, whose `-nt` compares whole seconds, so a build that lands in the same
+# second as the stamp is reported as not newer and the stale install survives. Measured, by rebuilding
+# and watching it decline to reinstall. Equality has no such window, and it also catches the case
+# ordering cannot see at all — an *older* binary restored over a newer one, which is what checking out
+# an earlier commit does.
+#
+# `reuse` is one word or the empty string rather than an array, because `/bin/bash` 3.2 treats an
+# *empty* array expanded under `set -u` as an unbound variable — which would have aborted precisely the
+# fresh-install path this is for. An empty scalar is set, so it expands to nothing, and the expansion is
+# deliberately unquoted for that reason.
+binary_mtime=$(stat -f %m "$binary")
+
 reuse=--reuse
 if [ -n "${E2E_FRESH:-}" ]; then
   reuse=
   echo "E2E_FRESH is set: reinstalling the app."
-elif [ ! -e "$stamp" ] || [ "$binary" -nt "$stamp" ]; then
+elif [ "$(cat "$stamp" 2>/dev/null)" != "$binary_mtime" ]; then
   reuse=
-  echo "No install on record for this binary, or it is newer than the last one: installing it."
+  echo "This binary is not the one that was last installed: installing it."
 fi
 
 # shellcheck disable=SC2086 # empty means "no flag"; see above
 npx detox test --configuration ios.sim.debug $reuse "$@"
 
-# Only reached when Detox passed, because of `set -e`. A failed run deliberately leaves the stamp
-# alone, so the next run installs again rather than reusing an install that may not have completed.
+# Only reached when Detox passed, because of `set -e`. A failed run deliberately leaves the stamp alone,
+# so the next run installs again rather than reusing an install that may not have completed.
 if [ -z "$reuse" ]; then
-  touch "$stamp"
+  echo "$binary_mtime" >"$stamp"
 fi

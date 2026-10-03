@@ -609,11 +609,21 @@ the app is not uninstalled and reinstalled per run. **Measured on the full 14-te
 **The stamp is the part that keeps `--reuse` honest.** Reuse is safe for JS, which Metro serves, and
 unsafe for native code, which is compiled into the binary — and a stale install presents as a missing JS
 export, which is the confusing failure the note at the top of `.detoxrc.js` exists for. Leaving that
-distinction to whoever remembers it was not acceptable for a flag that is now on by default, so the
-script `touch`es `ios/build/.detox-installed` after a successful install and drops `--reuse` whenever the
-built binary is newer than the stamp. `E2E_FRESH=1` forces one by hand. The stamp is only written when
-Detox **passed**, so a failed run reinstalls next time rather than trusting an install that may not have
-finished.
+distinction to whoever remembers it was not acceptable for a flag that is now on by default, so
+`ios/build/.detox-installed` records **which** binary was installed, as that binary's modification time,
+and `--reuse` is dropped whenever the binary on disk is not that one. `E2E_FRESH=1` forces a reinstall by
+hand. The stamp is only written when Detox **passed**, so a failed run reinstalls next time rather than
+trusting an install that may not have finished.
+
+**The comparison is equality, and the first version's `-nt` was a bug.** The drafted design asked whether
+the binary was *newer* than the stamp, and that was implemented and then caught by testing it: `/bin/bash`
+here is 3.2, whose `-nt` compares whole seconds, so a binary and a stamp landing in the same second
+compare as "not newer" and the stale install survives. Observed directly — the binary was touched, the
+next run declined to reinstall, and both files read `23:41:04`. The window is narrow in practice, since a
+real build takes minutes and the stamp is written at the end of a passing run, but it is the kind of hole
+that only shows up as a baffling missing-export failure months later. Equality on the recorded mtime has
+no window at all, and it catches what ordering structurally cannot: an **older** binary restored over a
+newer one, which is exactly what checking out an earlier commit and rebuilding does.
 
 Verified by running `pnpm e2e:build` and confirming the next run reinstalled — and one thing turned up
 there worth knowing: `expo prebuild` **clears `ios/`**, which takes `ios/build` and so the stamp with it.
