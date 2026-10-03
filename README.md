@@ -202,7 +202,8 @@ the Pro's own list render with no query at all.
 
 ## What is honestly missing
 
-Found while building, not discovered afterwards. Each of these has an entry in `DECISIONS.md`.
+All of these were found while building rather than discovered afterwards, and each one's reasoning is
+written down where it bit — in `DECISIONS.md`, or in the comment at the top of the file it is about.
 
 **The data model, where the API runs out:**
 
@@ -243,6 +244,9 @@ Found while building, not discovered afterwards. Each of these has an entry in `
 - **The available list's paging is asserted on the hook and on the device, never at the screen.** A
   `FlatList` under React Native Testing Library renders `initialNumToRender` rows and never lays out,
   so every assertion available there would be about the virtualisation window.
+- **Neither seam covers layout, and the reference screenshots were never committed.** `PRD.md` puts
+  the visual layer outside both suites, checked by eye against a `reference/` directory; that directory
+  does not exist in this repo, so "by eye" has been against the PRD's prose and nothing else.
 
 **And one process deviation, recorded rather than hidden:** `PRD.md` and issue #16 both require that
 every commit be authored by Renato Probst and nobody else, with no co-author trailer anywhere in the
@@ -266,8 +270,8 @@ In the order it would be worth doing:
 3. **The two role-locked apps and the parity script** (#13), which is the architecture claim
    `docs/adr/0003` makes and this repo does not yet check.
 4. **The web target** (#14): static export, the tab bar becoming a sidebar at `md:`, a Vercel deploy.
-5. **A design pass** — tab icons, the empty-state glyphs and the muted tint checked against
-   `reference/` rather than by eye.
+5. **A design pass** — tab icons, which `@expo/vector-icons` would need installing for, the
+   empty-state glyphs, and the visual layer checked against reference screenshots that exist.
 6. **A second Pro**, which is what would let the "somebody else holds this job" rule be asserted on a
    device instead of only in Jest.
 7. **Android**, which the stack supports and nothing here verifies.
