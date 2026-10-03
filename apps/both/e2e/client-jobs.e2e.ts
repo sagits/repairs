@@ -23,7 +23,8 @@
  *
  * **This is the one spec that still opens on `delete: true`, and the skeleton is why.** Everywhere else
  * a signed-out opening now comes from `repairs:///?reset=1`, which empties the two persisted stores
- * without the uninstall-and-reinstall `delete: true` costs — see `apps/both/dev-reset.ts`. That reset
+ * directly rather than by uninstalling the app — see `apps/both/dev-reset.ts`, including the measurement
+ * showing that it is not actually the faster of the two on this machine. That reset
  * cannot help here: it has no handle on the react-query cache, which lives inside `AppProviders`. A
  * relaunch carrying a warm cache would answer the Client's list from memory, leaving only the 300ms
  * mount hold where `ADR 0001` sized the assertion against 600ms of pending request. Deleting the app is
