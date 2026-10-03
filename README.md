@@ -6,8 +6,26 @@
 - Client user: Posts repair jobs and tracks them
 - Pro user: Picks up jobs and completes them
 - Monorepo with shared packages to share the same screens, components, and logic between multiple apps (so we can split the original app into 2 different apps in the future, and share code with any React web projects)
-- API requests done with TanStack react Query (to dummyjson.com/todos) and augmented with local Zustand store saved data to save the result from the POST/PUT/DELETE requests and still have the app calling a normal API with TanStack React Query (because using React Query for requests/requests cache and zustand/redux for what needs to be persisted/changed locally is what apps usually do)
+- API requests done with TanStack react Query (to dummyjson.com/todos) and augmented with local Zustand store saved data to save the result from the POST/PUT/DELETE requests and still have the app calling a normal API with TanStack React Query (because using React Query for requests/requests cache and zustand/redux for what needs to be persisted/changed locally is what apps usually do).
 
+<div>
+    <a href="https://www.loom.com/share/4b3a655d7c3e43dd9edb1a30d757c93c">
+      <p>Repair Jobs App Architecture with RepNative 1 - Watch Video</p>
+    </a>
+    <a href="https://www.loom.com/share/4b3a655d7c3e43dd9edb1a30d757c93c">
+      <img style="max-width:300px;" src="https://www.loom.com/v1/videos/4b3a655d7c3e43dd9edb1a30d757c93c/thumbnail.gif">
+    </a>
+  </div>
+
+<div>
+    <a href="https://www.loom.com/share/22430cb332e9485ea0a03b640d5c647a">
+      <p>Mobile Take-Home — Repair Jobs App 2 - Watch Video</p>
+    </a>
+    <a href="https://www.loom.com/share/22430cb332e9485ea0a03b640d5c647a">
+      <img style="max-width:300px;" src="https://www.loom.com/v1/videos/22430cb332e9485ea0a03b640d5c647a/thumbnail.gif">
+    </a>
+  </div>
+  
 ## Architecture
 
 - **Expo** (SDK 57, the current latest — managed workflow) + **Expo Router** (file-based routing,
