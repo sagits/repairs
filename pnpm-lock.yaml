@@ -271,6 +271,10 @@ importers:
       '@repairs/ui':
         specifier: workspace:*
         version: link:../ui
+    devDependencies:
+      '@repairs/testing':
+        specifier: workspace:*
+        version: link:../testing
 
   packages/stores:
     dependencies:
@@ -282,7 +286,11 @@ importers:
 
   packages/types: {}
 
-  packages/ui: {}
+  packages/ui:
+    dependencies:
+      '@repairs/types':
+        specifier: workspace:*
+        version: link:../types
 
 packages:
 

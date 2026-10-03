@@ -18,5 +18,8 @@
     "nativewind": "*",
     "react": "*",
     "react-native": "*"
+  },
+  "devDependencies": {
+    "@repairs/testing": "workspace:*"
   }
 }

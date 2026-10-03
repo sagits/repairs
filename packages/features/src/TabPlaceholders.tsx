@@ -1,14 +1,17 @@
 /**
- * The two job tab screens, standing in until the ticket that owns each one arrives. They are here
- * rather than empty because the route tree and the derived tab bar landed before the lists did, and a
- * tab has to land somewhere to be a tab. Settings is no longer among them; it is a real screen now.
+ * The job tab screens that are still standing in until the ticket that owns each one arrives. They are
+ * here rather than empty because the route tree and the derived tab bar landed before the lists did, and
+ * a tab has to land somewhere to be a tab. Settings left this file when it became a real screen, and so
+ * has the Client's half of `JobsHomeScreen`.
  *
- * `JobsHomeScreen` is the one route both Roles reach: a Client's posted jobs, a Pro's available
- * jobs. That split is the Role driving the experience, and it is already real.
+ * `JobsHomeScreen` is the one route both Roles reach: a Client's posted jobs, a Pro's available jobs.
+ * That split is the Role driving the experience, and the Client's side of it is now the real list —
+ * available jobs is `#9`'s.
  */
 import { Text, View } from 'react-native';
 import { HeaderBand, Screen } from '@repairs/ui';
 import { useSession } from '@repairs/stores';
+import { PostedJobsScreen } from './PostedJobsScreen';
 import { RoleGuard } from './RoleGuard';
 
 function TabPlaceholder({ title, line }: { title: string; line: string }) {
@@ -28,7 +31,7 @@ export function JobsHomeScreen() {
   return role === 'pro' ? (
     <TabPlaceholder title="Available" line="Open jobs you can claim will appear here." />
   ) : (
-    <TabPlaceholder title="My Jobs" line="The jobs you have posted will appear here." />
+    <PostedJobsScreen />
   );
 }
 
