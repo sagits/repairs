@@ -1379,3 +1379,67 @@ All four get one, so that a missing marker never has to be interpreted:
 - **0004** — implemented, with one sentence drifted: "picking a Role signs you in" was true of the Role
   picker that `#2`'s login form replaced. The id-13 decision the ADR is about is untouched, so the sentence
   is annotated rather than rewritten.
+
+## The web target is un-deferred, and the custom `tabBar` the PRD's route tree names cannot carry the sidebar
+
+`#14` was deferred part way through `/implement-spec` and is now built. The deferral entry's three
+consequences are settled rather than still open: the web target **has** been exercised, so the README no
+longer has to say it is future work, and the product gap that entry flagged — "`RoleTabBar` stays a bottom
+bar on every device, native included" — closes on native at the same time, because the breakpoint is in
+classes and a wide iPad reaches it.
+
+**The one thing in `PRD.md` that turned out to be wrong is a single line of its route tree:**
+`_layout.tsx — role-aware tabs, custom tabBar, md: sidebar`. Those last two cannot both be true. Which side
+of the content a bar sits on is `flexDirection` on whatever element holds the bar and the content, and when
+the bar is handed to the navigator as its `tabBar` prop, that element is the navigator's own `View` with an
+inline `flexDirection` taken from its `tabBarPosition` option. A `md:` class cannot reach an inline style on
+someone else's element, and `tabBarPosition` is read from the focused screen's descriptor — so driving it
+would mean measuring the window and branching, which is the thing the ticket rules out by name.
+
+So `TabsLayout` owns the container instead: `flex-col-reverse md:flex-row` around `<RoleTabBar />` and the
+navigator, with `tabBar={() => null}`. `flex-col-reverse` is what lets the bar stay **first in the tree**
+while rendering last on a phone, so the `md:` switch to a row needs no second ordering kept in step with the
+first. `RoleTabBar` itself is untouched apart from its own `md:` classes, which was the point of it taking a
+tab name and a callback rather than Expo Router's tab bar props: the shape of the thing above it changed and
+the derivation did not.
+
+What that costs is the two things the navigator used to hand the bar for free. The route you are on now comes
+from `usePathname`, and leaving a tab from `router.navigate`. Both are a translation — `/` is the `index`
+tab, whose file name never appears in a path — and **that translation is the whole subject of the new
+`TabsLayout.test.tsx`**, because nothing else in the suite would notice if either half drifted: a wrong route
+still navigates, to the wrong screen. The Detox specs tap `tab-index`, `tab-mine` and `tab-settings` dozens
+of times and would catch it on a device, but they catch it as a failed assertion three screens later.
+
+**Three smaller things, none of which were open questions.**
+
+`+html.tsx` is in the PRD's route tree and had never been written; it is now, and it is three lines that each
+have a reason. `viewport-fit=cover` is what makes `env(safe-area-inset-*)` resolve to real numbers in a
+browser, which is what `react-native-safe-area-context` reads, so the bar keeps its bottom inset. Expo's own
+`ScrollViewStyleReset` stops the page getting a second scrollbar beside the `ScrollView`'s. The background
+colour is set on `<body>` in plain CSS and is the one hardcoded token in the codebase: it has to be painted
+before the bundle has parsed, and `AppProviders`' hydration gate deliberately holds that first frame.
+
+The acceptance criterion about deprecated shadow props needed **no change at all**, which is worth recording
+because it reads like work. `tokens.js` has used `boxShadow` since it was written and its own comment says
+why; the criterion was written against a risk that this codebase had already closed. Verified rather than
+assumed: a dev-mode web build, where React Native Web's deprecation warnings are compiled in, logs none.
+
+`AsyncStorage` on web is `localStorage`, as the PRD said it would be — the Role survives a reload with no
+code at all. It is worth knowing *why* the static export does not fall over on it: `output: "static"`
+prerenders every route in Node, where `window` does not exist, and `AsyncStorage`'s web implementation reads
+`window.localStorage` inside a `try`. The read rejects, hydration never finishes, and the hydration hook's
+`getServerSnapshot` already answers `false` for exactly this case — so the prerendered HTML is the holding
+frame, which is the correct thing for it to be.
+
+**And one thing the browser found that no device could, left unfixed on purpose.** `AvailableJobsScreen`'s
+row is a `Pressable` that opens the Job, with the Claim `ActionButton` — another `Pressable` — inside it.
+React Native Web turns `accessibilityRole="button"` into a real `<button>`, so on web that row is a button
+inside a button: invalid HTML, and React logs it twice, once as a nesting error and once as a hydration
+one. It is **not** a regression from this ticket — that row has looked like this since `#10` and nothing
+here touches it — and it is not a deprecated style prop, so it is outside this ticket's acceptance.
+Claiming still works, because the inner press stops at the inner button.
+
+It is left alone because the fix is a product decision rather than a web one: the whole card being the tap
+target is what the Job list is, and the only way out is to shrink it to a title that opens and a button
+that claims. That is a change to how the app behaves on a phone, made to satisfy a validator the phone does
+not run, and it is not this ticket's to make. Worth its own issue.

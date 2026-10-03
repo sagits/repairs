@@ -5,6 +5,11 @@
  *
  * It takes the Role, the route it is on and a callback rather than Expo Router's tab bar props, so
  * the derivation is testable without a navigator. `TabsLayout` is the adapter.
+ *
+ * **Bottom bar on a phone, left sidebar from `md:` up**, and every difference between the two is a `md:`
+ * class on the same two elements — so there is no width to measure and no second layout to keep in step.
+ * A wide iPad gets the sidebar for the same reason a browser does. The one thing classes here cannot say
+ * is which side of the content the bar sits on; `TabsLayout` owns that.
  */
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,7 +41,7 @@ export function RoleTabBar({
     <View
       testID="tab-bar"
       accessibilityRole="tablist"
-      className="flex-row border-t border-border bg-surface pt-2"
+      className="flex-row border-t border-border bg-surface pt-2 md:w-sidebar md:flex-col md:gap-1 md:border-r md:border-t-0 md:pt-8"
       style={{ paddingBottom: bottom || 8 }}
     >
       {TABS[role].map((tab) => {
@@ -48,7 +53,7 @@ export function RoleTabBar({
             accessibilityRole="tab"
             accessibilityLabel={tab.label}
             accessibilityState={{ selected }}
-            className="flex-1 items-center py-1"
+            className="flex-1 items-center py-1 md:flex-none md:px-1 md:py-2"
             onPress={() => onSelect(tab.name)}
           >
             <Text className={selected ? 'text-sm font-semibold text-primary' : 'text-sm text-inkMuted'}>

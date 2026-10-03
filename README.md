@@ -78,7 +78,17 @@ pnpm typecheck
 pnpm lint
 ```
 
-`test` and `typecheck` need nothing beyond Node and the install. The device suite does:
+`test` and `typecheck` need nothing beyond Node and the install. So does the web target, which is the
+same source in a browser:
+
+```sh
+pnpm build:web                                 # static site in apps/both/dist
+npx serve apps/both/dist                       # smoke check
+```
+
+`vercel.json` deploys that `dist` with a rewrite for `/job/:id`, which is the one dynamic route.
+
+The device suite needs more:
 
 ```sh
 pnpm e2e:build                                 # expo prebuild + detox build — needs Xcode, CocoaPods and cmake
@@ -90,7 +100,7 @@ pnpm e2e:test
 
 
 2. **The two role-locked apps and the parity script** (issue #13, not done): My initial idea was to create 3 apps: one for both users, one for Client user, and one for Pro user. They could share the same logic and components because of the monorepo structure.
-3. **The web target** (issue #14, not done): I would like to send this to Vercel (as a web project using react native web, sharing same layout and features as native) so its easier to test
+3. ~~**The web target** (issue #14): I would like to send this to Vercel (as a web project using react native web, sharing same layout and features as native) so its easier to test~~ — **done.** `pnpm build:web` exports the static site, `vercel.json` deploys it, and from the `md:` breakpoint up the tab bar is a left sidebar with the content centred — which a wide iPad gets too, because it is classes rather than a measured width.
 
 ## The documents in this repo
 
