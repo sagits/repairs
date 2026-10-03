@@ -5,12 +5,13 @@
  * has the Client's half of `JobsHomeScreen`.
  *
  * `JobsHomeScreen` is the one route both Roles reach: a Client's posted jobs, a Pro's available jobs.
- * That split is the Role driving the experience, and the Client's side of it is now the real list —
- * available jobs is `#9`'s.
+ * That split is the Role driving the experience, and both sides of it are now real lists — so this file
+ * is down to the Role branch itself and the one tab still waiting for its screen.
  */
 import { Text, View } from 'react-native';
 import { HeaderBand, Screen } from '@repairs/ui';
 import { useSession } from '@repairs/stores';
+import { AvailableJobsScreen } from './AvailableJobsScreen';
 import { PostedJobsScreen } from './PostedJobsScreen';
 import { RoleGuard } from './RoleGuard';
 
@@ -28,11 +29,7 @@ function TabPlaceholder({ title, line }: { title: string; line: string }) {
 export function JobsHomeScreen() {
   const role = useSession((session) => session.role);
 
-  return role === 'pro' ? (
-    <TabPlaceholder title="Available" line="Open jobs you can claim will appear here." />
-  ) : (
-    <PostedJobsScreen />
-  );
+  return role === 'pro' ? <AvailableJobsScreen /> : <PostedJobsScreen />;
 }
 
 /**

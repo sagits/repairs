@@ -89,7 +89,14 @@ describe('login', () => {
     await waitForVisible('tab-mine');
     await expectElement(element(by.id('tab-index'))).toHaveLabel('Available');
     await expectElement(element(by.id('tab-settings'))).toHaveLabel('Settings');
-    await expectElement(element(by.text('Open jobs you can claim will appear here.'))).toBeVisible();
+    /**
+     * A row off the available list, which is a Pro's home screen and nobody else's. It replaces the tab
+     * placeholder's sentence, which `#10` deleted when it built the real list — the same edit, for the same
+     * reason, that `#7` had to make here when it deleted the Client's placeholder. A row rather than the
+     * band's title because "Available" is also this Role's first tab label, so the text matches twice; and
+     * a `waitFor` rather than an assertion because the rows arrive 600ms after the tap.
+     */
+    await waitForVisible('available-job-1');
 
     await element(by.id('tab-settings')).tap();
 

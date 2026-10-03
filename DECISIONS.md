@@ -870,3 +870,62 @@ failing on a 30-second matcher for a row that was never on screen.
 Reordering is the whole fix, and it generalises: **a test that arrives somewhere by deep link cannot be
 relied on to leave.** Put it last, or relaunch after it. `#6`'s guard spec gets away with it because a
 redirect is what it is asserting, so the link's destination is a screen the app chose.
+
+## The fixtures bridge gained a second parameter, naming a method rather than an id
+
+`#8` and `#9` both recorded the same gap from opposite sides: `apps/both/fixtures.ts` reaches the fixture
+server's seeded failure by rewriting a **URL**, so a failure that lives in a request body — a create's
+`userId` — or in a request with no id in it at all cannot be reached from a device. `#8`'s failed create and
+`#9`'s failed cancel were both driven in Jest for that reason, and `#8` estimated the fix at two lines.
+
+`#10` is the ticket that needed it, and it is two lines. The Pro's available list is
+`GET /todos?limit=20&skip=0` — there is no id in it to poison, so `?fixtureUser=9001` cannot make it fail,
+and that is an **error state with a Retry** in this ticket's acceptance criteria. So there is now a second
+parameter on the same deep-link channel:
+
+```
+device.openURL({ url: 'repairs:///?fixtureFail=GET' })   // every read 500s
+device.openURL({ url: 'repairs:///?fixtureFail=PUT' })   // every claim and completion does
+device.openURL({ url: 'repairs:///?fixtureFail=' })      // back to a working server
+```
+
+**It is still one failure in the fixtures, reached a second way.** The implementation drops the seeded id
+into the path — every endpoint's URL begins `/todos` — and the fixture server's existing poisoned-id check
+answers the 500 in its own words. A `failNext()` switch, or a second failure mode in the fixture server,
+would have been a second thing to keep in step with the first; this is the same rewrite as `?fixtureUser=`
+pointed at a different part of the request.
+
+**Neither `#8`'s nor `#9`'s Jest test was rewritten to use it.** Both drive a real request through a real
+screen and assert the rollback, which the device cannot see — a device can only see the card. The entries
+recording why they are in Jest stand; what changes is that the *device* half is now possible, and `#11` and
+`#12` take it.
+
+## Available jobs' paging is asserted on the hook and on the device, and deliberately not at the screen
+
+`AvailableJobsScreen.test.tsx` asserts the rows, the posting Client, the error card and the empty state, and
+says nothing at all about paging. That is not an omission.
+
+**A `FlatList` under React Native Testing Library renders `initialNumToRender` rows and never lays out.** So
+the rendered rows are the first ten of sixteen, a row from page two is never mounted however the next page is
+triggered, and `onEndReached` is not a prop on any host element a query can reach — it belongs to
+`VirtualizedList`'s scroll handling. Every assertion available at that seam would be about the virtualisation
+window rather than about the list. The three claims that matter are asserted where they are facts:
+
+- **the stopping rule**, in `useJobs.test.tsx`, driven to the end of the real dataset: thirteen pages, a
+  fourteen-row last page, then `hasNextPage === false` and 217 open rows out of 254. A rule that multiplied a
+  page number by a page size, or that stopped on the first short page, stops in the wrong place here.
+- **a Local job appearing exactly once across three loaded pages**, in the same file, which is the trap
+  `applyOverlayToPages` exists for and the one thing a single-page list cannot show.
+- **the scroll itself**, in `pro-available.e2e.ts`, where a real list really scrolls — to a row that can only
+  have come from page two, then back to one from page one, which is what "the list never blanks between
+  pages" means when the pages are real.
+
+**The empty state is driven in Jest and not on the device, for a different reason.** `GET /todos` answers 254
+rows by design — the dataset's size is what makes thirteen pages a fact rather than a fixture — so an empty
+available list means handing the app a different dataset, which is a bigger lie than the one parameter it
+would need. The screen test wraps `fetch` one layer outside the fixture server and answers an empty
+envelope, which is the same seam `JobDetailScreen.test.tsx` uses to fail a single verb.
+
+**Rows are matched by `testID` and never by title, in both seams.** The fixtures derive a title from
+`id % 12`, so every twelfth row reads the same sentence and `by.text(…)` matches twenty-one elements once
+three pages are loaded — which Detox fails rather than ignores. The id is the only unique handle a row has.

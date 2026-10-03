@@ -236,6 +236,34 @@ it('pages off the total, and shows a Local job exactly once across three loaded 
 });
 
 /**
+ * The stopping rule, driven to the end of the real dataset rather than argued about. 254 rows over pages
+ * of twenty is thirteen pages, the last of which is **fourteen rows** — so a rule that multiplied a page
+ * number by a page size, or that stopped when a page came back short, would stop in the wrong place.
+ * `getNextPageParam` counts the rows that actually arrived and compares them with the envelope's `total`,
+ * which is the one thing in the response that is about the dataset rather than about the page.
+ *
+ * The 217 is the fixtures' own arithmetic — every seventh todo is done, except `56`, which is one of the
+ * Client's four open ones, plus the Client's two done — and not this filter run twice.
+ */
+it('pages to the end of the dataset and then stops, off the envelope total', async () => {
+  const { result } = await renderHook(() => useAvailableJobs(), { wrapper });
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+  // Each page is awaited to the render it causes before the next is asked for, for the reason the test
+  // above gives: `fetchNextPage` reads its page parameter off the render it was called from.
+  for (let page = 2; page <= 13; page += 1) {
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+    await waitFor(() => expect(result.current.isFetchingNextPage).toBe(false));
+  }
+
+  expect(result.current.hasNextPage).toBe(false);
+  expect(result.current.data).toHaveLength(217);
+  expect(result.current.data?.every((job) => job.status === 'open')).toBe(true);
+});
+
+/**
  * `useJob` — one Job, and the four answers it has to be able to give: the server's row, a Local job the
  * server has never heard of, a claim laid over either, and "there is no such Job".
  *
