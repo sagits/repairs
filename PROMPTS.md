@@ -86,8 +86,7 @@ together.
     got a deliberately partial README, covering the Client side only. This one extends it.
 24. "spawn a subagent to push main" — done directly instead, being one command that touches no working
     tree.
-25. The attribution decision. #16's requirement that no commit carry a co-author trailer was found
-    only when that ticket was read, by which point 55 of 58 commits carried one and `main` had been
-    pushed. The options were a history rewrite plus a force-push, or recording the deviation. Chose:
-    **"Leave history, record the deviation."** The README and `DECISIONS.md` both say so, and this
-    file is the disclosure the requirement was protecting.
+
+## After build
+
+Made the necessary changes to README, asked the agent to add a Login screen with e-mail, password, and user type switch (and add the necessary tests)
