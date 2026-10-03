@@ -14,6 +14,13 @@ set -m
 
 cd "$(dirname "$0")/.."
 
+# Boot the target device before Detox gets to it. Detox would boot it anyway, but its `boot()`
+# returns early on an already-booted device, which skips the `open -a Simulator` this machine has
+# no app for — and leaves the device on screen in DeviceHub from the first frame rather than
+# halfway through the run. The name is read from `.detoxrc.js` so it lives in one place.
+# `simctl boot` errors when the device is already booted, which is the usual case.
+xcrun simctl boot "$(node -p "require('./.detoxrc.js').devices.simulator.device.name")" 2>/dev/null || true
+
 port=8081
 log=metro.log
 
