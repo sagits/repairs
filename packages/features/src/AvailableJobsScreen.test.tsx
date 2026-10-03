@@ -19,10 +19,9 @@
  * `render` and `userEvent` are awaited because both are async in React Native Testing Library 14.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { PEOPLE, useLocalJobs, useSession } from '@repairs/stores';
-import { CLIENT_USER_ID } from '@repairs/testing';
 import type { Role } from '@repairs/types';
 import { AvailableJobsScreen } from './AvailableJobsScreen';
 
@@ -113,22 +112,16 @@ it('lists the open Jobs a page brought back, and drops the done ones it fetched'
 
 /**
  * A `userId` is all the API gives us, so the row says exactly that and no more — inventing names for 149
- * users would be fiction in the one place a reviewer looks for honesty. The one case we can answer
- * properly is the person reading it, and a Job they posted in-app is how that is reached: all four of the
- * Client's open Jobs upstream are on later pages.
+ * users would be fiction in the one place a reviewer looks for honesty, and there is no `You` case to make
+ * an exception for: only a Pro reaches this list, and a Pro's id is never a Job's `clientId`. `#10` asked
+ * for that label and `DECISIONS.md` records why it was deleted instead of asserted from a Role the app
+ * cannot be in.
  */
-it('names the posting Client by id, and one the signed-in Client posted as themselves', async () => {
-  signInAs('client');
+it('names the posting Client by id, because an id is all the API gives us', async () => {
   await renderScreen();
   await waitFor(() => expect(screen.getByTestId(`available-job-${AN_OPEN_JOB.id}`)).toBeOnTheScreen());
 
   expect(screen.getByText(`Client #${AN_OPEN_JOB.clientId}`)).toBeOnTheScreen();
-
-  await act(async () => {
-    useLocalJobs.getState().createJob({ title: 'Garage door will not lift' }, CLIENT_USER_ID);
-  });
-
-  await waitFor(() => expect(screen.getByText('You')).toBeOnTheScreen());
 });
 
 it("shows what failed in the server's own words, with a Retry that asks again", async () => {

@@ -1277,3 +1277,86 @@ part-typed word when the field loses focus, which against an email field is the 
 and a mysterious "Enter a valid email address". `typeText` stays where the keystroke itself is the assertion,
 which is `new-job.e2e.ts`'s "says nothing about a short title while it is being typed" and nowhere on this
 screen.
+
+## The `You` row label is deleted, because one person holds one Role and only a Pro reaches that list
+
+`#10`'s criterion reads "Rows read `Client #N`, or `You` for a job the current Client posted", and
+`AvailableJobsScreen` implemented it as `job.clientId === user?.id ? 'You' : …`. **The branch could not
+fire.** `JobsHomeScreen` renders that screen only when `role === 'pro'`, a Pro's `user.id` is the string
+`pro-1` and a Job's `clientId` is the API's number, and `GLOSSARY.md` says what makes that permanent: one
+Role at a time. The PRD asked for a label the Role split forbids.
+
+`AvailableJobsScreen.test.tsx` was reaching it by signing in as a **Client** and rendering the Pro's screen —
+a state the app cannot produce — then posting a Job in-app so a `clientId` would match. So the choice was
+between deleting the branch and keeping a test that manufactures an impossible Role. **The branch is
+deleted**, along with the `postingClient` helper, the row's `user` prop and the screen's `useSession` read;
+the test keeps its first half, which is the real assertion that a row names its Client by id.
+
+Keeping it and fixing the test was considered and there is nothing to fix it *to*: every honest way to reach
+the branch requires a person who is a Client and a Pro at once. This repo has already thrown out two
+assertions for exactly that reason — the deep-link spec that passed against a link that never arrived, and
+`toHaveText` on a masked password, which passes while the screen shows bullets. A test that signs in as the
+wrong Role is the same failure one layer up: green, and about nothing.
+
+**What survives is the honest half of the requirement.** `JobDetailScreen` still says `Posted by you`, and
+there it is reachable and asserted in both seams — a Client does open their own Jobs. If a second Role ever
+sees the available list, or one person holds both Roles, this is three lines to put back; the deletion is
+what keeps the suite from claiming it already works.
+
+## The review's four extractions, applied with this repo's own test, and the two that were declined
+
+`/code-review` found six duplications. The test is `DECISIONS.md`'s own, from the second in-app confirm: a
+shared thing has to be smaller than its interface, and two callers earn a file where one did not.
+
+**Taken.** The two failure titles two screens each have to word identically (`jobText.ts`, which already
+exists for exactly this). The error card, four near-copies — three load errors with a Retry, plus
+`JobActions`' `ActionError` which was that card without one — now `ErrorCard` in `@repairs/ui` at three props
+and an optional `retry`, six call sites. The glyph frame, four copies of one `className` with the "there is no
+icon font in this build" paragraph pasted above three of them — now `GlyphFrame`, two props, and the paragraph
+once. `ROLE_LABELS`, which was a `Record<Role, string>` in Settings and an array of `{ role, label }` in the
+login form: the same two words, twice, in two shapes, now beside the `Role` type with `ROLES` derived from it.
+
+`ErrorCard` left `JobActions.tsx` rather than growing a `retry` prop in place, because a card reporting
+"Could not load your jobs" has no business being imported from a file named for actions. `ActionButton` stays:
+it really is about an action, and the paragraph arguing why these two were one file is now that file's only
+subject.
+
+**Declined, with reasons, because a declined finding is worth more on the record than silence.**
+
+- **The two-bar glyph body in `AvailableJobsScreen` and `ClaimedJobsScreen`**, which are byte-identical. With
+  the frame shared, what is left is two `View`s. How many bars an empty state draws is part of what it means —
+  posted jobs draws three — so the picture stays with the screen and only the frame around it is shared.
+- **`EVERY_WRITE_FAILS` and `A_WORKING_SERVER`, duplicated in `pro-available.e2e.ts` and `pro-mine.e2e.ts`.**
+  `resetToTheLoginForm` moved into `sign-in.ts` because getting to a known starting state is what every spec
+  does and none of them is about. Seeding a fixture failure is the opposite: it is each of those two specs'
+  **subject**, and the two lines sit next to the assertion they stage. A third module beside the specs for two
+  string literals costs more reading than it removes, and the drift it would prevent is loud — a spec whose
+  seeded failure stopped arriving fails on its own next assertion.
+
+**And one flattening that was not an extraction.** `JobDetailScreen`'s Pro branch was a four-deep ternary
+inside the JSX. The review suggested two components; it is two named conditions above the `return` and two
+flat lines in the markup instead, because a component would have had to be handed the two mutations the
+screen owns — which is the thing the branch's own comment explains it must not do. `!claimable` on the second
+condition is the precedence the nesting used to carry: mid-claim both are true at once, and without it a
+second button appears under the spinning first one.
+
+## The four ADRs get status markers, which is not the edit the deferral entry ruled out
+
+`ADR 0003` describes `apps/client`, `apps/pro` and `scripts/check-app-parity.mjs` in the present tense, and
+none of them exists. `README.md` and the deferral entry above both say so, but **an ADR is authoritative and
+gets read on its own**, so a reader who opens `0003` first is told the split ships.
+
+The deferral entry said the ADR was "left as written rather than edited, because an ADR records a decision at
+a date". That still holds and is what this does: the reasoning, the consequences and the "Considered options"
+are untouched — including the rejected option calling an unexecuted claim worth nothing, which is now this
+repo's own position and reads better for being left alone. What is added is a status block above the body.
+
+All four get one, so that a missing marker never has to be interpreted:
+
+- **0001** — implemented, except that **`reference/` was never committed**, which the ADR asserts as the thing
+  layout is checked against. The README already recorded it; the ADR did not.
+- **0002** — implemented in full.
+- **0003** — accepted, **not implemented**, deferred by **#13**.
+- **0004** — implemented, with one sentence drifted: "picking a Role signs you in" was true of the Role
+  picker that `#2`'s login form replaced. The id-13 decision the ADR is about is untouched, so the sentence
+  is annotated rather than rewritten.

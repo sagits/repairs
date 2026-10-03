@@ -216,9 +216,12 @@ written down where it bit — in `DECISIONS.md`, or in the comment at the top of
 - **A Server job has no description and no created date.** A DummyJSON todo is a title, a `completed`
   flag and a `userId`. The detail screen says so in a line rather than rendering an empty field, and a
   Local job — one this app created — has both.
-- **The posting Client renders as an id.** The API gives a `userId` and no name, and looking up 149
-  users to label a row is a request per row for a string. A real API would return the name with the
-  job.
+- **The posting Client renders as an id, on every row with no exception.** The API gives a `userId` and
+  no name, and looking up 149 users to label a row is a request per row for a string. A real API would
+  return the name with the job. Issue **#10** also asked for `You` on a row the reader posted, and that
+  label has been **deleted rather than left unreachable**: only a Pro sees the available list, one person
+  holds one Role, and a Pro's id is never a Job's `clientId`. The detail screen does say `Posted by you`,
+  because a Client does open their own Jobs there. `DECISIONS.md` has the argument.
 - **The overlay is a client-side answer to a server-side problem**, as above, and
   `GET /todos` cannot filter by status, which is why the available list filters after a page arrives
   and a page of twenty can render fewer than twenty rows. A documented trade-off, not a defect.

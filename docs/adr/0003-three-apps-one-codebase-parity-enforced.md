@@ -1,5 +1,17 @@
 # Three apps from one codebase, with route-tree parity enforced by a script
 
+> **Status: accepted 2026-10-02, not implemented.** Deferred by issue
+> **#13** on 2026-10-03, part way through the build, and that issue is commented and left open.
+> `apps/client`, `apps/pro` and `scripts/check-app-parity.mjs` **do not exist**, no `check:apps` script
+> was added, and nothing in this repo checks route-tree parity. What was built is the groundwork this
+> turns on and nothing more: `appRole` as a prop on `AppProviders` with a context behind it, `RoleGuard`,
+> and the rule that an `apps/*/app/` file is a route and a re-export.
+>
+> Everything below is the decision as it was made and is **left as written** — including the rejected
+> option that calls an unexecuted claim worth nothing, which is now this repo's own position. Only this
+> marker is added, because an ADR is authoritative, is read on its own, and the present tense below
+> otherwise reads as a description of the code. `DECISIONS.md` has the deferral and its consequences.
+
 The brief asks for one app serving both Roles, and `apps/both` satisfies it alone. We ship two
 more — Repairs Client and Repairs Pro, each role-locked — because the second half of the same
 architecture problem is the one a real product hits a year later: shipping the same feature code

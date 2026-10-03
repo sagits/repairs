@@ -1,5 +1,11 @@
 # The Client's upstream user id is 13, and that is load-bearing
 
+> **Status: accepted 2026-10-02, implemented.** One sentence below has drifted: "picking a Role signs
+> you in" was true of the Role picker, which `#2`'s login form replaced. Signing in is a credential form
+> now, and the credentials are checked against nothing — the form's Role switch decides which hardcoded
+> person you become, exactly as the picker did. Everything this ADR turns on is unchanged, which is why
+> the sentence is annotated rather than rewritten.
+
 There is no sign-in: picking a Role signs you in as a hardcoded person for that Role. The Client's
 id is a real upstream user id, so their posted-jobs list is a genuine API call rather than a
 fixture — and the specific id matters. The upstream dataset spreads 254 todos over 149 users, most

@@ -13,27 +13,21 @@
  * each page is full would hide a backend shortcoming behind client complexity, and the first thing a real
  * backend gets is `?status=open`.
  *
- * **The posting Client is an id, so it renders as one.** `GET /todos` gives us a `userId` and nothing
- * else; we never call the users endpoint, and inventing names for 149 of them would be fiction in the one
- * place a reviewer looks for honesty. The one case we can answer properly is the person reading it.
+ * **The posting Client is an id, so it renders as one — every row, with no exception for the reader.**
+ * `GET /todos` gives us a `userId` and nothing else; we never call the users endpoint, and inventing names
+ * for 149 of them would be fiction in the one place a reviewer looks for honesty. `#10` asked for `You` on a
+ * Job the reader posted, and this screen cannot honestly offer it: one person holds one Role, and only a Pro
+ * ever reaches this list. `DECISIONS.md` records why that label was deleted rather than left unreachable.
+ * `JobDetailScreen` *can* say it, because a Client does open their own Jobs there.
  */
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAvailableJobs, useClaimJob } from '@repairs/api';
-import { useSession } from '@repairs/stores';
 import { colors, ErrorCard, GlyphFrame, HeaderBand, Screen } from '@repairs/ui';
-import type { Job, User } from '@repairs/types';
+import type { Job } from '@repairs/types';
 import { ActionButton } from './JobActions';
 import { CLAIM_FAILED } from './jobText';
 import { JobListSkeleton, useSkeletonHold } from './listSkeleton';
-
-/**
- * Who posted it, in the only terms the API supports. `JobDetailScreen` says the same thing in a sentence
- * rather than a label, and the two are deliberately not one helper: the shared part is a single
- * comparison, where the strings around it are each screen's own copy.
- */
-const postingClient = (job: Job, user: User | null) =>
-  job.clientId === user?.id ? 'You' : `Client #${job.clientId}`;
 
 /**
  * One row: the Job, who posted it, and the Claim. The card is the way into the detail — the row *is* the Job,
@@ -48,12 +42,10 @@ const postingClient = (job: Job, user: User | null) =>
  */
 function AvailableJobRow({
   job,
-  user,
   onOpen,
   onClaim,
 }: {
   job: Job;
-  user: User | null;
   onOpen: () => void;
   onClaim: () => void;
 }) {
@@ -68,7 +60,7 @@ function AvailableJobRow({
         {job.title}
       </Text>
       <View className="mt-2 flex-row items-center justify-between gap-3">
-        <Text className="flex-1 text-sm leading-5 text-inkMuted">{postingClient(job, user)}</Text>
+        <Text className="flex-1 text-sm leading-5 text-inkMuted">{`Client #${job.clientId}`}</Text>
         <ActionButton testID={`claim-job-${job.id}`} label="Claim" onPress={onClaim} />
       </View>
     </Pressable>
@@ -105,7 +97,6 @@ function LoadingMore() {
 
 export function AvailableJobsScreen() {
   const router = useRouter();
-  const user = useSession((session) => session.user);
   const {
     data,
     error,
@@ -165,7 +156,6 @@ export function AvailableJobsScreen() {
           renderItem={({ item }) => (
             <AvailableJobRow
               job={item}
-              user={user}
               onOpen={() => router.push(`/job/${item.id}`)}
               onClaim={() => claim.mutate(item)}
             />

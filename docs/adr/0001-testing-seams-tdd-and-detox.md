@@ -1,5 +1,11 @@
 # Two testing seams: TDD below the screen, Detox at it
 
+> **Status: accepted 2026-10-02, implemented — with one thing below that does not exist.** Both seams
+> are built and green. **The `reference/` directory was never committed**, so "checked by eye against
+> `reference/`" has in practice been checked against `PRD.md`'s prose. The gap is real rather than
+> cosmetic: layout and the muted tint on an in-flight row are the two things neither suite asserts, and
+> both are recorded in `README.md` and `DECISIONS.md` as checked by eye and nothing else.
+
 Testing is split at the screen boundary so neither style has to do the other's job. Everything
 below a screen — the API mapping, the overlay, the stores, the schemas, the query hooks, and
 components with real interaction — is driven test-first with Jest and React Native Testing
