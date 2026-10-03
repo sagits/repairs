@@ -236,8 +236,8 @@ written down where it bit — in `DECISIONS.md`, or in the comment at the top of
   `GET /todos` cannot filter by status, which is why the available list filters after a page arrives
   and a page of twenty can render fewer than twenty rows. A documented trade-off, not a defect.
 
-**Deferred, not done:** the two role-locked apps and the web target, both of them in `## TO-DO`
-below. And the write path has never met the real API — reads have, `PUT /todos/{id}` has not.
+**Deferred, not done:** the two role-locked apps and the web target are both in `## TO-DO` below.
+And the write path has never met the real API: reads have, `PUT /todos/{id}` has not.
 
 **Where the tests stop:**
 
@@ -269,8 +269,7 @@ them and there is no "Generated with" line anywhere. `DECISIONS.md` has the entr
 
 ## TO-DO
 
-Two tickets were deliberately not done. Both are open, and each carries a comment on the issue
-explaining why it was left.
+Two tickets are open and deliberately unbuilt. Each one has a comment on the issue saying why.
 
 - **[#14 — The web target](https://github.com/sagits/repairs/issues/14).** `react-native-web`,
   `react-dom` and a `build:web` script are installed and wired; the script has never been run and
@@ -279,7 +278,7 @@ explaining why it was left.
   bottom bar on every device, which is a product gap and not only a missing platform.
 - **[#13 — Repairs Client and Repairs Pro, with parity enforced](https://github.com/sagits/repairs/issues/13).**
   `apps/client`, `apps/pro` and `scripts/check-app-parity.mjs` do not exist. `docs/adr/0003` has the
-  reasoning and now carries a deferred marker pointing at the issue.
+  reasoning, and it carries a deferred marker pointing at the issue.
 
 ## What more time would buy
 
@@ -331,10 +330,10 @@ From the [Matt Pocock skills](https://github.com/mattpocock/skills), installed w
 
 From neither:
 
-- `AGENTS.md` — written and re-added by `turbo` itself, not by any skill. Its first line says so: a
-  managed block of Turborepo guidance for agents. Edit it and `turbo` puts it back.
+- `AGENTS.md`, which `turbo` writes and re-adds itself. Its first line says as much: a managed block of
+  Turborepo guidance for agents. Edit it and `turbo` puts it back.
 
 Deliverables of the work rather than configuration:
 
-- `README.md` and `PROMPTS.md` — issue #16's output. `PROMPTS.md` is where the use of AI is disclosed
-  in full.
+- `README.md` and `PROMPTS.md` are issue #16's output, and `PROMPTS.md` is where the use of AI is
+  disclosed in full.
