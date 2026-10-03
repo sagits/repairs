@@ -20,7 +20,7 @@
  * Detox's `expect` is imported under another name because Jest's global `expect` is also in scope.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
-import { LOGIN_FORM, signIn } from './sign-in';
+import { resetToTheLoginForm, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -56,17 +56,6 @@ const statusOf = (jobId: string, status: string) =>
   element(by.text(status).withAncestor(by.id(`claimed-job-${jobId}`)));
 
 /**
- * Back to the login form without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
- * `login.e2e.ts`, `settings.e2e.ts` and `new-job.e2e.ts` have the same three lines. It empties both persisted
- * stores, which is what makes "the only claim on this device" true below.
- */
-const resetToTheLoginForm = async () => {
-  await device.launchApp({ newInstance: true });
-  await device.openURL({ url: 'repairs:///?reset=1' });
-  await waitForVisible(LOGIN_FORM);
-};
-
-/**
  * Today, as `jobText.ts` formats it. A claim's `claimedAt` is written by the app at the moment of the tap, so
  * the only honest expected value is the day this run happens on — and it is derived the same way the screen
  * derives it, off an ISO string's own `YYYY-MM-DD`, because a `Date` renders in the device's time zone and
@@ -80,7 +69,7 @@ function today(): string {
 
 describe('pro claimed jobs', () => {
   it('says so when a Pro holds nothing, rather than showing an empty screen', async () => {
-    await resetToTheLoginForm();
+    await resetToTheLoginForm(waitForVisible);
 
     await signIn('pro');
     await waitForVisible('tab-mine');

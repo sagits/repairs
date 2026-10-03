@@ -36,6 +36,7 @@
  * fixture dataset; the `+` is on screen from the first frame and belongs to no other Role.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { resetToTheLoginForm } from './sign-in';
 
 /**
  * Sized for the slowest wait in the suite with room to spare, and no more than that. `waitFor` returns
@@ -54,18 +55,6 @@ const VISIBLE_WITHIN = 30_000;
 const waitForVisible = (testID: string) =>
   waitFor(element(by.id(testID))).toBeVisible().withTimeout(VISIBLE_WITHIN);
 
-/**
- * Back to "nobody has ever used this", without uninstalling the app. `apps/both/dev-reset.ts` is the
- * mechanism; `launchApp({ delete: true })` is what this replaces, and it reinstalled the app per test.
- */
-const RESET = 'repairs:///?reset=1';
-
-const resetToTheLoginForm = async () => {
-  await device.launchApp({ newInstance: true });
-  await device.openURL({ url: RESET });
-  await waitForVisible('login-title');
-};
-
 /** Any valid-looking pair will do, which is the behaviour and not a shortcut around it. */
 const AN_EMAIL = 'renato@example.com';
 const A_PASSWORD = 'hunter2';
@@ -83,7 +72,7 @@ const signIn = async (role: 'client' | 'pro') => {
 
 describe('login', () => {
   it('opens on the login form, with the password masked and both Roles offered', async () => {
-    await resetToTheLoginForm();
+    await resetToTheLoginForm(waitForVisible);
 
     await expectElement(element(by.id('login-email'))).toHaveLabel('Email');
     await expectElement(element(by.id('login-password'))).toHaveLabel('Password');
@@ -158,7 +147,7 @@ describe('login', () => {
   });
 
   it('signs a Pro in to their three tabs, and the tabs navigate', async () => {
-    await resetToTheLoginForm();
+    await resetToTheLoginForm(waitForVisible);
 
     await signIn('pro');
 

@@ -34,7 +34,7 @@
  * and a screen name — and by text where the text is the assertion.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
-import { LOGIN_FORM, signIn } from './sign-in';
+import { LOGIN_FORM, resetToTheLoginForm, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -64,19 +64,9 @@ const waitForVisible = (testID: string) =>
 const waitForText = (text: string) =>
   waitFor(element(by.text(text))).toBeVisible().withTimeout(VISIBLE_WITHIN);
 
-/**
- * Back to the login form without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
- * `login.e2e.ts` has the same two lines. This replaces a `launchApp({ delete: true })`.
- */
-const resetToTheLoginForm = async () => {
-  await device.launchApp({ newInstance: true });
-  await device.openURL({ url: 'repairs:///?reset=1' });
-  await waitForVisible(LOGIN_FORM);
-};
-
 describe('settings', () => {
   it('shows the person behind the current Role: name, email and the Role itself', async () => {
-    await resetToTheLoginForm();
+    await resetToTheLoginForm(waitForVisible);
 
     await signIn('pro');
     await waitForVisible('tab-settings');
