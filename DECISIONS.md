@@ -1025,3 +1025,63 @@ So the group's `testID` is waited on with `toExist`, which is the structural cla
 is a done group now" — and what has to be *seen* is read off a row: the status pill, matched `withAncestor` its
 own row rather than as whichever pill Detox found first. The negative stays `not.toExist()`, which was never
 affected.
+
+## The live spec fences itself off in Node, and the obvious way to read `EXPO_PUBLIC_API` there breaks the file
+
+`PRD.md:833` says "one spec, `live.e2e.ts`, runs against the real DummyJSON" and leaves open the thing that
+actually needs deciding: what that spec does during the other runs. It cannot simply sit in `e2e/` and be run
+by hand, because `pnpm e2e:test` with no arguments picks up every `*.e2e.ts` and would run it against the
+fixtures bundle — green, and lying, which is the one outcome this ticket exists to prevent.
+
+So the spec reads `EXPO_PUBLIC_API` **in the Detox runner's own process** and is a `describe.skip` unless it
+is `live`. `scripts/e2e-test.sh` already exports the value it decided on, so there is one source of truth and
+no second flag to keep in step. A default run now reports **38 passed, 3 skipped**, and the skip carries its
+reason in the `describe` name, because that is the only string the reporter prints.
+
+**`process.env.EXPO_PUBLIC_API` is the spelling that does not work, and it fails in a way that points
+nowhere near itself.** The e2e specs are compiled by the app's `babel.config.js`, and `babel-preset-expo`'s
+`inline-env-vars` rewrites any `process.env.EXPO_PUBLIC_*` member expression into a read against
+`expo/virtual/env`, injecting the import. That module is ESM inside `node_modules`, which the Detox Jest
+project does not transform, so the whole file dies at parse time with `SyntaxError: Unexpected token 'export'`
+reported **against line 2 of the file's own comment block**. Nothing in that message mentions environment
+variables.
+
+`const { EXPO_PUBLIC_API } = process.env` looks like the fix and is not: Babel's own destructuring transform
+rewrites the pattern into exactly the member expression the plugin is watching for, in the same traversal, and
+the injected import comes straight back — confirmed by reading the transform output, not by guessing. What
+works is an alias, `const nodeEnv = process.env`, because then the member expression's object is a plain
+identifier and the plugin's `process.env` test does not match. Any future e2e spec wanting an `EXPO_PUBLIC_*`
+value needs the same two lines. This is the mirror image of the entry above about the flag being read in the
+app rather than in `packages/`: there the rewrite is what we want and `expo` resolving is the problem, here
+`expo` resolves fine and the rewrite is the problem.
+
+**An upstream failure is checked for before the app is launched, which is how it ends up legible.** A third
+party going down, rate-limiting us or reshaping its dataset would otherwise surface as "Timed out while
+waiting for expectation", which is indistinguishable from a bug in the app. So `beforeAll` reads
+`GET /todos/user/13` and `GET /todos/9999` from Node and fails with a message that names DummyJSON, names the
+URL, prints what came back, and says in its first line that no other spec is affected. Verified by pointing
+the base URL at `dummyjson.invalid`: all three tests fail in milliseconds, the app is never launched, and the
+message is the one above.
+
+That check is also where the expected titles come from. They are read over a second, independent connection
+rather than written into the spec, so the assertion is "the screen shows what the server served" rather than
+"the screen shows six strings somebody typed in October". The **counts** stay written down, because those are
+`ADR 0004`'s claim rather than an observation — and the ADR is what has to be re-verified and re-recorded if
+the live dataset ever moves, rather than the spec being adjusted until it passes.
+
+**`ADR 0004` was re-verified against the live API as part of this, and it holds exactly.** `GET /todos/user/13`
+answers `total: 6`, with ids `2` and `183` completed and `21`, `76`, `82`, `86` open — four open Jobs and two
+done ones on a cold install, which is what the ADR records. The live titles are the dataset's own
+("Memorize a poem", "Create a compost pile", …) and bear no resemblance to the fixtures' repair-shop strings,
+which is what makes the first test unable to pass against the wrong bundle.
+
+**Both directions were asserted, which is this repo's standing rule for a green E2E claim.** Besides the
+unreachable-host check above, the guard was forced open and the spec run against the **fixtures** Metro: it
+failed on `posted-job-2` never existing, because the fixtures give user 13 different ids. So the spec is
+genuinely coupled to the live data and the skip is the only thing keeping it out of the default suite — not a
+spec that would have passed either way.
+
+**The write path is deliberately untouched.** `updateTodo` has never been run against `PUT /todos/{id}` on the
+real 254-row dataset, and this spec is read-only by its ticket's own wording, so it stays that way. It reads a
+list, reads one record, and reads a 404; it writes nothing, persists nothing, and leaves no state for the next
+spec to trip on.
