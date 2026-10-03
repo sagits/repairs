@@ -1,3 +1,5 @@
+**- Also check the Turno Host App copy I made on https://github.com/sagits/sweep-public**
+
 # Repairs
 
 - A repair-jobs app where **two kinds of users share the same app** and see different things
