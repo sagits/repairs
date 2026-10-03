@@ -493,3 +493,103 @@ is a re-export and nothing else and `#13`'s parity script is about to enforce th
 
 The second use arrives with `#8` — "A Client posts a job" — and it is a one-line wrap. Recorded so the
 count reads as pending rather than as a requirement half-met.
+
+## The app reads the fixtures flag now, and a list's error and empty states arrive by deep link
+
+`EXPO_PUBLIC_API=fixtures` had never been read anywhere but `jest.setup.ts`, because until this ticket no
+screen fetched anything. Three things were needed to make `PRD.md:838`'s "Detox runs against it by
+default" true:
+
+- `apps/both/fixtures.ts` installs the fixture server over `fetch`, imported from `app/_layout.tsx` beside
+  `global.css` so it is in place before any screen can ask for anything. The flag is read in the app for
+  the reason already recorded above — `babel-preset-expo` rewrites the literal into a read against
+  `expo/virtual/env`, which no file under `packages/` can resolve.
+- `scripts/e2e-test.sh` exports `EXPO_PUBLIC_API=fixtures` unless it is already set, so the suite defaults
+  to fixtures and `live.e2e.ts` gets the real API with `EXPO_PUBLIC_API=live pnpm e2e:test …`.
+- **A deep link, `?fixtureUser=<id>`, is how a spec reaches the seeded failure.** The failing id is `9001`
+  and an id nobody owns answers an empty list, but the id the Client's list asks for comes from the
+  session — which is product code with no business knowing about either. `fixtures.ts` listens for the
+  parameter and rewrites `/todos/user/N` on its way into the fixture server. The session, the Role, the
+  person and the query key are all untouched; the only thing that changes is what the server says, which
+  is what a real outage changes too.
+
+The entry above about the seeded failure says "a Detox spec can reach the error state through a launch
+argument alone". **That turned out to be wrong**, and all three alternatives were ruled out before the
+deep link was written: `launchArgs` needs a native module to read them back and none is installed;
+`launchApp({ url })` is dropped entirely by this stack, which is already recorded; and an
+`EXPO_PUBLIC_*` variable cannot vary per spec, because one `pnpm e2e:test` run is one Metro and so one
+bundle. `device.openURL` against the running app is the one channel that works here, and it is already
+the one the guard's spec uses.
+
+**A mode change needs a refetch to be felt, so both states are driven by pulling to refresh.** It is the
+only trigger the screen has that does not wait on `staleTime: 30_000` elapsing — a remount from a tab
+switch or a Role switch reads the cache and asks for nothing — and it earns the pull-to-refresh
+acceptance criterion on the way past. Retry is proved by *recovery*, so the link goes back to the real
+Client before the button is pressed: pressing it against a failure that is still seeded would only have
+asserted that the card is still there, which is true whether or not the button does anything.
+
+## Detox counts a pending fetch as "not idle", so the skeleton assertion needs synchronisation off
+
+`ADR 0001` engineers a flat 600ms fixture delay against a 300ms skeleton hold so that "skeleton visible,
+then wait for the content" has 200ms of daylight either side. The margin is real and it is not sufficient:
+**Detox does not return from an action until the app is idle, and a pending request is not idle.** So a
+synchronised `element(by.id('continue-as-client')).tap()` returns 600ms later, after the request has
+answered and the skeleton it was meant to catch has already been replaced. Measured: the first draft of
+`client-jobs.e2e.ts` sat on that matcher for the full 60-second timeout while every other assertion in the
+file passed.
+
+`device.disableSynchronization()` around that one tap, in a `try`/`finally` so a failure cannot leave it
+off for the specs below, and the assertion passes in eleven seconds. The 300-against-600 margin is what
+makes it deterministic *once Detox has stopped waiting*; it cannot rescue an assertion that only runs
+after the load. Any later spec asserting a loading state owes the same two lines — `#9`, `#10` and `#11`
+all have a list.
+
+Two smaller things in the same suite:
+
+- **`login.e2e.ts` and `settings.e2e.ts` no longer wait on "The jobs you have posted will appear here."**
+  That sentence was the Client's tab placeholder and this ticket deleted it. Both now wait on the `+` in
+  the posted-jobs header, which draws, is on screen before the request has answered, and belongs to no
+  other Role. Same shape of edit `#6` had to make to `login.e2e.ts`, for the same reason.
+- **A negative assertion on a `testID` is vacuous if the id is never right.** `client-jobs.e2e.ts` proves
+  a Server job carries no created date by asserting `posted-job-date` does not exist, which would pass
+  just as happily against a typo — so the Jest test for a Local job's date asserts that same id
+  *positively*. The pair is the assertion; neither half is.
+
+## `job/new` arrives as a route in this ticket, because typed routes make the `+` a type error otherwise
+
+The `+` in the posted-jobs header is one of this ticket's acceptance criteria and `#8` owns the screen it
+pushes, which looks like it should leave a `router.push('/job/new')` with nothing behind it. It cannot:
+`experiments.typedRoutes` generates `Href` from the files under `app/`, so the push does not compile until
+the route exists, and a cast to get past that would be a lie that outlives the ticket which fixes it.
+
+So `app/job/new.tsx` and a placeholder `NewJobScreen` land here — the same reasoning as the two tab
+placeholders, that a route has to land somewhere to be a route. **`#8` owns everything below its header**:
+the form, the validation, the mutation, and the `RoleGuard allow="client"` wrap that the entry above
+records as the guard's pending second use.
+
+`.expo/types/router.d.ts` is the one generated ambient file this repo does **not** commit, and that is
+consistent rather than an exception to the entry above: `.expo/` is gitignored, and without the file the
+`ExpoRouter.__routes` augmentation is simply absent, so `Href` falls back to `string` and a fresh clone
+typechecks. The file is only strict once a dev server has written it — which means a *local* typecheck is
+stricter than a clean one, and that is the direction worth having. Running `expo start` once is what
+regenerates it after a route is added.
+
+## The skeleton hold is anchored to mount, and a date is formatted off the ISO string rather than through `Intl`
+
+Two implementation choices in `PostedJobsScreen` that `PRD.md` leaves open and that both went a different
+way than the obvious one.
+
+**The 300ms hold starts at mount, not when the query goes pending.** For a first load those are the same
+moment, and for everything afterwards they deliberately are not: re-arming the hold on every pending would
+put three grey skeleton rows over a list the Client is already reading every time they pull to refresh,
+which is the exact thing the refreshing state exists to avoid. The first draft measured the elapsed time
+from a `useRef(Date.now())` and set state synchronously inside the effect, and the React compiler's lint
+rules rejected both — correctly. A `setTimeout` armed once on mount is shorter, and `pending || holding`
+says the whole rule in one line.
+
+**A Local job's date is read off its ISO string's own `YYYY-MM-DD` with a month table.** A `Date` renders
+in the device's time zone and an `Intl.DateTimeFormat` in the device's locale, and both are things a Jest
+assertion under Node and a Detox assertion under Hermes can disagree about on the same commit — Hermes
+abbreviates September as "Sept" where Node gives "Sep". `createdAt` is written by this app in UTC, so
+reading UTC back is not a simplification of the truth; it is the truth. If the app is ever localised, the
+table is what gets replaced.
