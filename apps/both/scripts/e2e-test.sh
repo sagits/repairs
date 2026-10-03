@@ -21,6 +21,18 @@ cd "$(dirname "$0")/.."
 # `simctl boot` errors when the device is already booted, which is the usual case.
 xcrun simctl boot "$(node -p "require('./.detoxrc.js').devices.simulator.device.name")" 2>/dev/null || true
 
+# The suite runs against the in-memory fixture server, so it cannot flake on the public API or on
+# whatever DummyJSON happens to be serving today. It is exported rather than written into an `.env`
+# because `live.e2e.ts` is the one spec that wants the real thing, and it gets it by starting this
+# script with the variable already set:
+#
+#   EXPO_PUBLIC_API=live pnpm e2e:test e2e/live.e2e.ts
+#
+# One run means one Metro and so one bundle, and `EXPO_PUBLIC_*` is inlined at bundle time — which is
+# why a spec cannot change this per test, and why the fixtures take their instructions from a deep
+# link instead. `apps/both/fixtures.ts` has that mechanism.
+export EXPO_PUBLIC_API="${EXPO_PUBLIC_API:-fixtures}"
+
 port=8081
 log=metro.log
 
