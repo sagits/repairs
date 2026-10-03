@@ -11,8 +11,10 @@ being measured and found wrong.
 2. `/ask-matt I want to build whats in @PRD.md, what skills should I use?` — picked the route through
    the skills. The PRD is already a spec, so the answer was to skip the grilling and the spec step and
    merge in near the bottom: domain docs, then tickets, then build.
-3. `/research` — fired at the version table, then cancelled before it ran. The SDK and library versions
-   in the PRD are still as-written, unverified.
+3. `/research` — fired at the version table, then cancelled before it ran, which left the PRD's
+   versions as-written and unverified. They were verified during the first ticket instead, against
+   primary sources, as `docs/research/stack-verification.md` — and four of the compatibility claims
+   attached to them did not hold.
 4. `/domain-modeling @PRD.md` — wrote `GLOSSARY.md` and ADRs 0001 and 0002. Three terms the PRD left
    overloaded came back as questions, and I settled them: cancelling is erasure rather than a fourth
    status, a claim record outlives the claim it records, and the two lists both labelled "My Jobs" get
