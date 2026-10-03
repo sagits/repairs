@@ -11,7 +11,13 @@
 module.exports = {
   testRunner: {
     args: { $0: 'jest', config: 'e2e/jest.config.js' },
-    jest: { setupTimeout: 180_000 },
+    // Device allocation and, on a fresh install, getting the app onto the simulator. Measured at a
+    // couple of seconds against the permanently booted `iPhone 16-Detox`, and this is sized for the
+    // worst case it has to clear rather than that: a simulator that has to be booted from cold and an
+    // install from scratch. It was 180s when Metro's cold bundle was on the common path, which
+    // `scripts/e2e-test.sh` now keeps off it. **Raise it, don't lengthen a run, if allocation ever
+    // starts timing out** — and say what changed, because nothing here should take a minute.
+    jest: { setupTimeout: 60_000 },
   },
   apps: {
     // `-derivedDataPath ios/build` is what lets `binaryPath` be named outright rather than guessed
