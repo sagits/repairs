@@ -24,10 +24,10 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { overlayClaim, useCompleteJob } from '@repairs/api';
 import { useLocalJobs, useSession } from '@repairs/stores';
-import { HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import { ErrorCard, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job } from '@repairs/types';
-import { ActionButton, ActionError } from './JobActions';
-import { asDay } from './jobText';
+import { ActionButton } from './JobActions';
+import { asDay, COMPLETE_FAILED } from './jobText';
 import { RoleGuard } from './RoleGuard';
 
 /**
@@ -183,9 +183,9 @@ function ClaimedJobs() {
       ) : (
         <ScrollView testID="claimed-jobs" contentContainerClassName="gap-5 px-5 py-6">
           {complete.error ? (
-            <ActionError
+            <ErrorCard
               testID="complete-job-error"
-              title="Could not mark this job done"
+              title={COMPLETE_FAILED}
               message={complete.error.message}
             />
           ) : null}

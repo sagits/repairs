@@ -25,10 +25,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useCancelJob, useClaimJob, useCompleteJob, useJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
-import { colors, HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import { colors, ErrorCard, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job, JobStatus, User } from '@repairs/types';
-import { ActionButton, ActionError } from './JobActions';
-import { asDay, proName } from './jobText';
+import { ActionButton } from './JobActions';
+import { asDay, CLAIM_FAILED, COMPLETE_FAILED, proName } from './jobText';
 
 /**
  * Who posted it. A `userId` is all the API gives us and all this says — `PRD.md` argues that at length:
@@ -98,25 +98,6 @@ function JobNotFound() {
       <Text className="mt-1 text-center text-base leading-6 text-slate">
         It may have been cancelled, or the link may be out of date.
       </Text>
-    </View>
-  );
-}
-
-/** What failed, in the server's own words, and the one thing to do about it. */
-function JobError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <View testID="job-error" className="rounded-card border border-danger bg-surface px-4 py-4">
-      <Text className="text-base font-semibold text-danger">Could not load this job</Text>
-      <Text className="mt-1 text-sm leading-5 text-slate">{message}</Text>
-      <Pressable
-        testID="retry-job"
-        accessibilityRole="button"
-        accessibilityLabel="Retry"
-        className="mt-3 self-start rounded-card bg-primary px-5 py-3"
-        onPress={onRetry}
-      >
-        <Text className="text-base font-semibold text-surface">Retry</Text>
-      </Pressable>
     </View>
   );
 }
@@ -196,7 +177,7 @@ function CancelJob({ job }: { job: Job }) {
   return (
     <View className="gap-3">
       {cancelJob.error ? (
-        <ActionError
+        <ErrorCard
           testID="cancel-job-error"
           title="Could not cancel this job"
           message={cancelJob.error.message}
@@ -297,18 +278,21 @@ export function JobDetailScreen() {
         <JobNotFound />
       ) : (
         <ScrollView contentContainerClassName="gap-3 px-5 py-6">
-          {error ? <JobError message={error.message} onRetry={refetch} /> : null}
-          {claim.error ? (
-            <ActionError
-              testID="claim-job-error"
-              title="Could not claim this job"
-              message={claim.error.message}
+          {error ? (
+            <ErrorCard
+              testID="job-error"
+              title="Could not load this job"
+              message={error.message}
+              retry={{ testID: 'retry-job', onPress: refetch }}
             />
           ) : null}
+          {claim.error ? (
+            <ErrorCard testID="claim-job-error" title={CLAIM_FAILED} message={claim.error.message} />
+          ) : null}
           {complete.error ? (
-            <ActionError
+            <ErrorCard
               testID="complete-job-error"
-              title="Could not mark this job done"
+              title={COMPLETE_FAILED}
               message={complete.error.message}
             />
           ) : null}

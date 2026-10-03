@@ -1,20 +1,23 @@
 /**
- * The two pieces every action on a Job is built from: the button that carries its own pending state, and the
- * card that says what went wrong.
+ * The button every action on a Job is made of: one that carries its own pending state.
  *
- * **They are presentation and nothing else — each caller holds its own mutation.** That is what lets the
+ * **It is presentation and nothing else — each caller holds its own mutation.** That is what lets the
  * available list mute the *row* while its button spins, and what keeps the error card above the row it
  * belongs to rather than at the top of a screen. A component that owned the mutation would have to hand both
  * of those back out through a render prop to achieve the same thing.
  *
- * **Why these two and not a `<ClaimJob>`.** `SettingsScreen`'s confirm and `JobDetailScreen`'s stayed apart
+ * **Why this and not a `<ClaimJob>`.** `SettingsScreen`'s confirm and `JobDetailScreen`'s stayed apart
  * because one component serving both would have taken nine props for two call sites. The test is whether the
- * shared thing is smaller than its interface, and these pass it: four props and three, across four call
- * sites — claim and complete, each from a list row and from the detail screen. What they share is not layout
- * but a rule, that a mutation in flight disables its own button and shows a spinner inside it, and that a
- * failure is reported in the server's own words next to the thing that failed.
+ * shared thing is smaller than its interface, and four props across four call sites passes it — claim and
+ * complete, each from a list row and from the detail screen. What they share is not layout but a rule, that a
+ * mutation in flight disables its own button and shows a spinner inside it.
+ *
+ * The other half of that rule — that a failure is reported in the server's own words next to the thing that
+ * failed — used to live here as `ActionError`. It is `ErrorCard` in `@repairs/ui` now, because the three
+ * load-failure cards on the lists and the detail screen were the same card with a Retry on it, and a card
+ * reporting "Could not load your jobs" has no business being imported from a file named for actions.
  */
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text } from 'react-native';
 import { colors } from '@repairs/ui';
 
 /**
@@ -49,27 +52,5 @@ export function ActionButton({
       {pending ? <ActivityIndicator testID={`${testID}-spinner`} color={colors.surface} /> : null}
       <Text className="text-base font-semibold text-surface">{label}</Text>
     </Pressable>
-  );
-}
-
-/**
- * What failed, beside the thing that failed. The message is the server's own words: `client.ts` goes out of
- * its way to parse a non-2xx body for its `message` so a screen can show it, and "Something went wrong" here
- * would throw away the only part of a failure anyone can act on.
- */
-export function ActionError({
-  testID,
-  title,
-  message,
-}: {
-  testID: string;
-  title: string;
-  message: string;
-}) {
-  return (
-    <View testID={testID} className="rounded-card border border-danger bg-surface px-4 py-4">
-      <Text className="text-base font-semibold text-danger">{title}</Text>
-      <Text className="mt-1 text-sm leading-5 text-slate">{message}</Text>
-    </View>
   );
 }

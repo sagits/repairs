@@ -21,9 +21,10 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } fr
 import { useRouter } from 'expo-router';
 import { useAvailableJobs, useClaimJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
-import { colors, HeaderBand, Screen } from '@repairs/ui';
+import { colors, ErrorCard, HeaderBand, Screen } from '@repairs/ui';
 import type { Job, User } from '@repairs/types';
-import { ActionButton, ActionError } from './JobActions';
+import { ActionButton } from './JobActions';
+import { CLAIM_FAILED } from './jobText';
 import { JobListSkeleton, useSkeletonHold } from './listSkeleton';
 
 /**
@@ -97,30 +98,6 @@ function NoAvailableJobs() {
   );
 }
 
-/**
- * What failed, and the one thing to do about it. **Inline, and never a blank screen** — it renders above
- * the rows rather than in place of them, so a page that fails leaves the Jobs that did arrive exactly
- * where they were. The message is the server's own words, which `client.ts` goes out of its way to parse
- * a non-2xx body for precisely so a screen can show them.
- */
-function AvailableJobsError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <View testID="available-jobs-error" className="rounded-card border border-danger bg-surface px-4 py-4">
-      <Text className="text-base font-semibold text-danger">Could not load available jobs</Text>
-      <Text className="mt-1 text-sm leading-5 text-slate">{message}</Text>
-      <Pressable
-        testID="retry-available-jobs"
-        accessibilityRole="button"
-        accessibilityLabel="Retry"
-        className="mt-3 self-start rounded-card bg-primary px-5 py-3"
-        onPress={onRetry}
-      >
-        <Text className="text-base font-semibold text-surface">Retry</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 /** The next page, on its way. It is a footer rather than a skeleton: the list above it stays put. */
 function LoadingMore() {
   return (
@@ -165,13 +142,16 @@ export function AvailableJobsScreen() {
   const errorCard =
     error || claim.error ? (
       <View className="gap-3">
-        {error ? <AvailableJobsError message={error.message} onRetry={() => void refetch()} /> : null}
-        {claim.error ? (
-          <ActionError
-            testID="claim-job-error"
-            title="Could not claim this job"
-            message={claim.error.message}
+        {error ? (
+          <ErrorCard
+            testID="available-jobs-error"
+            title="Could not load available jobs"
+            message={error.message}
+            retry={{ testID: 'retry-available-jobs', onPress: () => void refetch() }}
           />
+        ) : null}
+        {claim.error ? (
+          <ErrorCard testID="claim-job-error" title={CLAIM_FAILED} message={claim.error.message} />
         ) : null}
       </View>
     ) : null;

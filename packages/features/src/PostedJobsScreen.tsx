@@ -6,7 +6,7 @@
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useClientJobs } from '@repairs/api';
-import { colors, HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import { colors, ErrorCard, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job } from '@repairs/types';
 import { asDay, proName } from './jobText';
 import { JobListSkeleton, useSkeletonHold } from './listSkeleton';
@@ -81,33 +81,6 @@ function EmptyPostedJobs({ onPostJob }: { onPostJob: () => void }) {
 }
 
 /**
- * What failed, and the one thing to do about it. **Inline, and never a blank screen** — it renders above
- * the list rather than in place of it, so a refetch that fails leaves the Jobs that did arrive exactly
- * where they were and adds an explanation on top.
- *
- * The message is the server's own words. `client.ts` goes out of its way to parse a non-2xx body for its
- * `message` so that a screen can show it, and replacing that with "Something went wrong" here would
- * throw away the only part of the failure anyone can act on.
- */
-function PostedJobsError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <View className="rounded-card border border-danger bg-surface px-4 py-4">
-      <Text className="text-base font-semibold text-danger">Could not load your jobs</Text>
-      <Text className="mt-1 text-sm leading-5 text-slate">{message}</Text>
-      <Pressable
-        testID="retry-posted-jobs"
-        accessibilityRole="button"
-        accessibilityLabel="Retry"
-        className="mt-3 self-start rounded-card bg-primary px-5 py-3"
-        onPress={onRetry}
-      >
-        <Text className="text-base font-semibold text-surface">Retry</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-/**
  * The `+` beside the screen name. A `Text` glyph rather than an icon, for the same reason the empty
  * state's illustration is drawn by hand: there is no icon font in this build. Its accessibility label
  * is the sentence, not the character, because "plus" is not what it does.
@@ -139,7 +112,12 @@ export function PostedJobsScreen() {
    * failed to arrive.
    */
   const errorCard = error ? (
-    <PostedJobsError message={error.message} onRetry={() => void refetch()} />
+    <ErrorCard
+      testID="posted-jobs-error"
+      title="Could not load your jobs"
+      message={error.message}
+      retry={{ testID: 'retry-posted-jobs', onPress: () => void refetch() }}
+    />
   ) : null;
 
   return (
