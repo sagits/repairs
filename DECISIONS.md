@@ -1164,10 +1164,27 @@ was the right README to write then — one that describes plans is one nobody ca
 are real.
 
 `spec/repairs-mvp` then built the Pro's flow, so the same file is rewritten here rather than written fresh:
-every section of `main`'s version survives, with claiming and completing, the libraries and why each one, the
-verified requirement table and the gaps added on top. **It is the one file where `main` and this branch both
-moved, so the merge conflicts: keep this branch's version whole.** `main`'s is a strict subset of it, and the
-sections that look new are the ones that could not honestly have been written yet.
+every section of `main`'s version survives, with claiming and completing, the verified requirement table and
+the gaps added on top. It is the one file where `main` and this branch both moved, so the merge conflicts.
+
+**Correction, written at the merge: "keep this branch's version whole" is no longer the resolution.** That
+sentence was written when `main`'s README was the one commit `5ee9511` wrote. Renato then edited the file
+directly on `main` in four more commits (`b0ef4bb`, `a301348`, `3e87267`, `22905a1`) and said "I made some
+changes, dont remove them". `main`'s README stopped being a subset of this branch's at that point: it has his
+intro bullets, his `## Architecture` list, and a `## Workflow` section that is his own first-person account of
+the ten hours, including which skills he used and why. None of that exists on the branch and none of it could
+be regenerated from it.
+
+So the conflict is resolved by **reconciling the two, with his text as the base wherever they overlap**: his
+bullets, `## Architecture` and the whole of `## Workflow` kept verbatim and not edited at all, not even by
+`/humanizer`; his `## Running it` and `## Where the design lives` kept as his with only the corrections this
+branch earned folded in (the `--filter` spelling of `e2e:metro`, which has no root alias, the warm-Metro
+rule, the live-API command, and the counts); and the branch's `## What it does`, `## The fixture server`,
+`## Where it stands`, `## What is honestly missing` and `## What more time would buy` added underneath. The
+branch's `## The libraries, and why each one` is dropped, because his `## Architecture` covers that ground in
+his words and two library sections would disagree with each other. `## The shape of it` loses its heading and
+keeps its contents. A straight `git checkout --ours`, or `--theirs`, would have lost one author's work either
+way.
 
 Worth noting for the next person who writes one: the README is the only document in this repo that has had to
 be *reduced* in scope to stay honest and then grown back. `DECISIONS.md` and `PROMPTS.md` only ever grow,
