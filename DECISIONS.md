@@ -1154,3 +1154,22 @@ The requirement's own rationale is the fairest thing to measure the outcome agai
 the use of AI is disclosed, in full and on purpose, and it is — twenty-five entries, including the
 corrections. The commit log now discloses it a second time, which is not what was asked for. Recorded as
 unmet rather than quietly tidied.
+
+## `main`'s README is the Client-only half, and this branch's one supersedes it on the merge
+
+`main` got a README part way through the run, deliberately scoped to what was working at that commit: the
+Client's list, posting, cancelling, the fixture server and the two commands each suite needs, with the Pro's
+flow, the role-locked builds and the web target left out because they were planned rather than built. That
+was the right README to write then — one that describes plans is one nobody can trust about the parts that
+are real.
+
+`spec/repairs-mvp` then built the Pro's flow, so the same file is rewritten here rather than written fresh:
+every section of `main`'s version survives, with claiming and completing, the libraries and why each one, the
+verified requirement table and the gaps added on top. **It is the one file where `main` and this branch both
+moved, so the merge conflicts: keep this branch's version whole.** `main`'s is a strict subset of it, and the
+sections that look new are the ones that could not honestly have been written yet.
+
+Worth noting for the next person who writes one: the README is the only document in this repo that has had to
+be *reduced* in scope to stay honest and then grown back. `DECISIONS.md` and `PROMPTS.md` only ever grow,
+because an entry is true of the moment it was written. A README is in the present tense, and that is what
+makes it the document most likely to be quietly wrong.

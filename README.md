@@ -281,6 +281,6 @@ In the order it would be worth doing:
 `PRD.md` is the spec, and the code guidelines at the top of it are the ones this repo is written to.
 `GLOSSARY.md` fixes the vocabulary — every name in the code comes from there. `docs/adr/` has four
 ADRs for the decisions with consequences that outlive a ticket. `PROMPTS.md` is every prompt that
-built this, in order. `DECISIONS.md` has sixty-two entries, one for every place the PRD was left open
+built this, in order. `DECISIONS.md` has sixty-three entries, one for every place the PRD was left open
 or turned out to be wrong; where it and the PRD disagree, it is the one that holds, so read it before
 working rather than only when writing to it.
