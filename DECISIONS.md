@@ -267,3 +267,57 @@ container that exists only to be matched is a container that did not need to exi
 acceptance criteria for the tabs are the label and the active tint, both of which are met without it.
 Adding an icon font to pass a criterion that does not mention one is work the design pass can do when
 it is looking at the thing. Recorded so it reads as deferred rather than missed.
+
+## The fixtures flag is handed to the fixture server, not read by it
+
+`PRD.md:838` says "the flag is read **per call**, not once at module load", which reads as though the
+fixture server reads `EXPO_PUBLIC_API` itself. It cannot. `babel-preset-expo` rewrites a literal
+`process.env.EXPO_PUBLIC_API` into a read against `expo/virtual/env` and injects that import, and
+`expo` is a direct dependency of `apps/both` rather than a hoisted one — so from any file under
+`packages/`, Jest fails with `Cannot find module 'expo/virtual/env'`, and Metro would resolve it only
+by accident. `react-native` is hoisted and `expo` is not, which is why `packages/ui` gets away with
+importing one and not the other.
+
+So `installFixtureFetch(usingFixtures)` takes a predicate and calls it on every request.
+`apps/both/jest.setup.ts` supplies `() => process.env.EXPO_PUBLIC_API === 'fixtures'`, and the app's
+own entry will supply the same thing when a screen first fetches. The per-call guarantee is stronger
+this way, not weaker: there is no variable for the answer to be cached in. It also leaves
+`packages/testing` with no dependency on Expo at all.
+
+The flag read inside `apps/both` was checked rather than assumed: under Jest the rewrite leaves a live
+read against Node's `process.env`, so a test that assigns to it mid-run is honoured on the next call.
+
+Two more things the PRD left to the implementation, settled here:
+
+- **The dataset is generated from each todo's own id, not written out.** 254 literals would bury the
+  only property that matters, which is the shape: 13 pages of 20, and the Client holding six.
+  Generated is not random — there is no `Math.random()` or `Date.now()` anywhere in `fixtures.ts`,
+  and a delete echoes back a fixed `deletedOn` for the same reason.
+- **The seeded failure is one poisoned id, `9001`, honoured wherever an id appears** — a todo id, a
+  user id, a `skip`, or the `userId` in a create's body. A `failNext()` switch would have needed
+  mutable state and something to bridge a function call into the running app; an id needs neither, so
+  a Detox spec can reach the error state through a launch argument alone.
+- **The fixtures do not persist a write**, exactly as DummyJSON does not, and there is a test whose
+  only job is to hold that line. A fixture server that remembered would make the write overlay look
+  unnecessary while leaving it broken against the real API.
+
+## Turbo's `test` and `typecheck` were caching across changes to `packages/`
+
+Found while building `#3`, by watching `pnpm test` replay a cached pass over code that had just
+changed. Both tasks run in `apps/both` and deliberately reach over `packages/*` — that is the "one
+TypeScript project, one Jest project" decision above — but a Turbo task's hash is its own package's
+files plus the tasks it `dependsOn`, and neither declares one. Nothing in `packages/` was in the
+hash, so every edit below the app returned a stale green.
+
+`dependsOn: ["^test"]` is not the fix: `packages/*` have no `test` or `typecheck` script to depend on,
+by the same decision. Both tasks now name what they actually read:
+
+```json
+"inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/*/src/**"]
+```
+
+Verified both ways — a change under `packages/*/src` is a cache miss, an unchanged tree is still a
+hit. `lint` needs nothing, because each package lints itself.
+
+A stale green is worse than a red, and this one would have hidden a broken `packages/` change in
+every ticket from here on.

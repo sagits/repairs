@@ -5,8 +5,8 @@
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
     "build:web": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
     "lint": {},
-    "typecheck": {},
-    "test": {},
+    "typecheck": { "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/*/src/**"] },
+    "test": { "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/*/src/**"] },
     "e2e:build": { "cache": false },
     "e2e:test": { "cache": false }
   }
