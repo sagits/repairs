@@ -1,0 +1,34 @@
+# The route-tree parity check, on every push and every pull request. `ADR 0003` makes an architectural
+# claim — three products, one set of feature code, the app directories identical but for one constant —
+# and `scripts/check-app-parity.mjs` is what turns that claim into something that can fail. Running it
+# only when someone remembers to would make it an assertion again, which is the thing the ADR rejects.
+#
+# **This workflow is deliberately the parity check and nothing else, and the reason is honesty rather
+# than thrift.** `pnpm typecheck`, `pnpm lint` and `pnpm test` are the gates this repo actually runs, and
+# they have only ever been run on macOS with Xcode present; adding them here would commit the repo to a
+# pipeline nobody has watched go green, and a CI badge that is red on arrival teaches people to ignore
+# CI. The parity check is the opposite case: plain Node, no dependencies, so it needs no install, no
+# lockfile and no cache, and what runs here is exactly what runs locally.
+#
+# Add the other three when there is a machine to verify them on. `actions/setup-node` with `cache: pnpm`
+# and `pnpm install --frozen-lockfile` is the whole of what that would take.
+#
+# The script is invoked as `node scripts/check-app-parity.mjs` rather than through `pnpm check:apps`,
+# because installing pnpm to run a script that needs no install would be the only slow step here. The two
+# are the same command; `package.json` is where that is spelled out.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  parity:
+    name: Route-tree parity across the three apps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-app-parity.mjs

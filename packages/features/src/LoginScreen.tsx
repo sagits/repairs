@@ -19,6 +19,14 @@
  * default state and the other as the deviation from it. It sits *above* the Login button, since everything
  * the press depends on belongs above the thing you press.
  *
+ * **In Repairs Client and Repairs Pro the switch is not there at all, and the Role comes from the build.**
+ * `appRole` is the one constant those two products differ by, and this is the second of the two things
+ * `PRD.md:641` asks it to do: Settings reads it to drop the Role switcher, and this screen reads it to drop
+ * the Role *choice*, which is what leaves one login button for the one Role the build has. So the
+ * role-locked apps need no login screen of their own — the same file serves all three, and what it offers
+ * is derived rather than branched. `PRD.md:653` describes this as a button list because the screen was a
+ * Role picker when that was written; it is a credential form now, and the single button is its Login.
+ *
  * No icons: the mockup's person and padlock glyphs would need `@expo/vector-icons`, which is deliberately
  * not installed. The one blue in the palette, `accent`, is spent on the Show Password link, because reading
  * as a link is that control's whole job.
@@ -30,7 +38,8 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { FormField, Screen } from '@repairs/ui';
 import { useSession } from '@repairs/stores';
-import { LoginSchema, ROLES, ROLE_LABELS, type LoginInput, type Role } from '@repairs/types';
+import { LoginSchema, ROLES, ROLE_LABELS, type AppRole, type LoginInput, type Role } from '@repairs/types';
+import { useAppRole } from './appRole';
 
 /**
  * Which person the valid-looking credentials sign you in as. It is the one control on the screen that
@@ -66,8 +75,12 @@ function RoleSwitch({ role, onChange }: { role: Role; onChange: (role: Role) => 
   );
 }
 
-function LoginForm({ signIn }: { signIn: (role: Role) => void }) {
-  const [role, setRole] = useState<Role>('client');
+function LoginForm({ appRole, signIn }: { appRole: AppRole; signIn: (role: Role) => void }) {
+  /**
+   * The shared app opens on Client because something has to be selected and the two are symmetric; a
+   * role-locked build has no choice to make, so the Role it is locked to is the state's only value.
+   */
+  const [role, setRole] = useState<Role>(appRole === 'both' ? 'client' : appRole);
   const [revealed, setRevealed] = useState(false);
 
   const { control, handleSubmit } = useForm<LoginInput>({
@@ -116,7 +129,7 @@ function LoginForm({ signIn }: { signIn: (role: Role) => void }) {
             {revealed ? 'Hide Password' : 'Show Password'}
           </Text>
         </Pressable>
-        <RoleSwitch role={role} onChange={setRole} />
+        {appRole === 'both' && <RoleSwitch role={role} onChange={setRole} />}
         <Pressable
           testID="submit-login"
           accessibilityRole="button"
@@ -132,10 +145,11 @@ function LoginForm({ signIn }: { signIn: (role: Role) => void }) {
 }
 
 export function LoginScreen() {
+  const appRole = useAppRole();
   const role = useSession((session) => session.role);
   const signIn = useSession((session) => session.signIn);
 
   if (role) return <Redirect href="/" />;
 
-  return <LoginForm signIn={signIn} />;
+  return <LoginForm appRole={appRole} signIn={signIn} />;
 }

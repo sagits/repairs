@@ -1437,3 +1437,111 @@ footer: there is no update channel to check.
 
 The rows are built as a list and mapped, rather than written out, because which of them exist is the one
 variable thing on the screen — the Role lock takes the first away — and the dividers have to follow it.
+
+## The parity check compares more than the route trees, because the route trees do not stand alone
+
+`PRD.md:164` and `ADR 0003` both describe `scripts/check-app-parity.mjs` as diffing the three `app/`
+directories, and that alone would have left the ticket's own claim half-checked. `app/_layout.tsx` imports
+`../fixtures` and `../dev-reset`, which are between them a couple of hundred lines of test seam, and the
+other apps need their own copies for the import to resolve — so a diff scoped to `app/` would have
+enforced parity over seven one-line re-exports while the files they pull in drifted unwatched. The build
+config is the same story one step out: `metro.config.js`, `babel.config.js`, `tailwind.config.js`,
+`tsconfig.json`, `global.css`, `types.d.ts`, `nativewind-env.d.ts` and `scripts/e2e-test.sh` are identical
+in all three apps and have no reason not to be.
+
+So the script compares `app/**` plus a named list of ten shared files, and `app.json`, `package.json`,
+`.detoxrc.js` and `e2e/` are the deliberate omissions — the first three carry the name, the slug, the
+bundle identifier and the built binary's name, and `e2e/` differs because the shared app has eight specs
+and the role-locked pair have the one spec that is about being role-locked. It also fails if an
+`apps/*/src/` ever appears, which is `ADR 0003`'s own definition of the architecture having failed and the
+one failure a diff cannot see: a file only one app has is a file nothing is compared against.
+
+**The hole left open is that a shared file added to `apps/both` and not to the list is checked nowhere.**
+Every rule that would close it — "every root-level `.ts` file", "everything not in this other list" —
+needs its own exception list, which is the same list spelled twice with one copy able to rot. The list is
+named in the script's header as the thing to extend.
+
+One small change to `apps/both` fell out of this: `scripts/e2e-test.sh` now reads the built `.app` out of
+`.detoxrc.js` rather than spelling out `Repairs.app`, the same way it already reads the simulator's name
+from there. The bundle is named after the app, so the literal would have been the one line that differed
+between the three copies of a script the parity check compares. Verified by reading the path back; the
+value is byte-identical to the literal it replaced.
+
+## The login form derives its Role from `appRole`, which is the second half of a `#6` deferral
+
+`#6` recorded that `PRD.md:641` asks `appRole` to do two things — hide the Role switcher and pin the Role
+so the role-locked apps need no picker — and that only the first was built, because the second had no app
+to be true of. It does now. `LoginScreen` reads `useAppRole()`, renders the Role switch only under
+`appRole === 'both'`, and seeds its state with the locked Role otherwise. That is the whole of "one login
+button for its Role": the button was always one, and what the role-locked builds drop is the *choice*
+above it.
+
+`PRD.md:653` describes this as a button list — "the same screen, one button … derived from `appRole`" —
+because the login screen was a Role picker when that was written and is a credential form now. The
+derivation survived the rewrite; the two buttons it was derived into did not.
+
+## The role-locked apps have no Jest seam of their own, and `app.json` is not the only per-app file
+
+`ADR 0003` names "three Jest configs" among the costs of the split. They are not here, and that is the one
+place this implementation declines something the ADR priced in. The Jest project is rooted in `apps/both`
+and reaches over `packages/`, which is where everything under test lives, so a second and third copy would
+run the same 215 tests against the same files and report the same result three times. It would treble the
+suite and assert nothing new — and the thing it looks like it would catch, a role-locked app whose screens
+behave differently, cannot happen, because `appRole` is the only input that differs and
+`LoginScreen.test.tsx` and `SettingsScreen.test.tsx` both drive it directly through `AppRoleProvider`.
+
+The `test` script is therefore absent from `apps/client/package.json` and `apps/pro/package.json`, which is
+the only difference between them and `apps/both`'s besides the package name. Their `devDependencies` are
+kept identical even so, Jest's included: `tsconfig.json` includes `../../packages/*/src`, which is where
+the tests live, so `tsc` in a role-locked app typechecks `@testing-library/react-native` and `@types/jest`
+whether or not that app ever runs a test.
+
+What each new app does carry of its own is `app.json` (name, slug, scheme, bundle identifier),
+`package.json`, `.detoxrc.js` and one Detox spec. The `.detoxrc.js` is the one that will bite: `expo
+prebuild` builds the Xcode project from `app.json`'s `name` with every non-word character stripped, so
+"Repairs Client" becomes `RepairsClient` and that string is the workspace, the scheme and the `.app`.
+Renaming the app means renaming it in two files, and the symptom of forgetting is `xcodebuild` failing on
+a missing workspace.
+
+## CI is the parity check and nothing else, on purpose
+
+This repo had no CI at all before `#13`, and the ticket asks for one thing from it: that the parity check
+runs there. `.github/workflows/ci.yml` runs exactly that and nothing more.
+
+The temptation was to add `pnpm typecheck`, `pnpm lint` and `pnpm test` while the file was open. They are
+left out because they have only ever been run on one macOS machine with Xcode present, and a pipeline
+nobody has watched go green is the same unexecuted claim `ADR 0003` rejects — with the added cost that a
+CI badge which is red on arrival teaches everyone to ignore CI. The parity check is the opposite case: it
+is plain Node with no dependencies, so the job is a checkout, a Node, and the script, and what runs there
+is exactly what runs locally. It is invoked as `node scripts/check-app-parity.mjs` rather than through
+`pnpm check:apps` for the same reason — installing pnpm to run a script that needs no install would be the
+only slow step in the job.
+
+Adding the other three is `actions/setup-node` with `cache: pnpm` and `pnpm install --frozen-lockfile`,
+and it should be done by whoever can watch it fail.
+
+## `README.md`'s improvements list still says `#13` is not done
+
+The README's `## Improvements` section is Renato's own first-person text, kept verbatim by the resolution
+recorded above, and its second item reads "The two role-locked apps and the parity script (issue #13, not
+done)". That is now wrong, and it is left alone rather than rewritten: it is his account, not a
+description of the code, and an agent editing his voice to keep a status line current is a worse trade
+than a stale line. Flagged here and in the handover so he can strike it himself.
+
+## The root Detox scripts are serialised, because there are three apps and one simulator
+
+`pnpm e2e:build` and `pnpm e2e:test` were `turbo run …` with nothing holding them back, which was correct
+while `apps/both` was the only app with those scripts. With three, turbo would run them in parallel, and
+all three want the same two things at once: Metro's port 8081 and the one booted `iPhone 16-Detox`. Three
+Metros cannot have the port and three Detox runs cannot have the device, so the first symptom would have
+been a mess of launch failures that look nothing like the cause.
+
+Both root scripts now pass `--concurrency 1`. That is the whole fix, and it is on the root script rather
+than in `turbo.json` because turbo's concurrency is a run-level flag and not a per-task one. The
+consequence is the honest one: the device suite now takes three times as long to build and to run, which
+is `ADR 0003`'s "three of everything" arriving in the one place it costs wall-clock time. `pnpm --filter
+@repairs/client e2e:test` is still the way to run one app's specs alone.
+
+**Neither root script has been run since this change.** `#13` was implemented without Detox, by request,
+so the serialisation is reasoned rather than measured and the two new apps have never been prebuilt. The
+first `pnpm e2e:build` on this branch is the real test of the `.detoxrc.js` names.

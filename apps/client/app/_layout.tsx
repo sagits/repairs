@@ -19,7 +19,7 @@ import '../dev-reset';
 
 export default function RootLayout() {
   return (
-    <AppProviders appRole="both">
+    <AppProviders appRole="client">
       <Stack screenOptions={{ headerShown: false }} />
     </AppProviders>
   );

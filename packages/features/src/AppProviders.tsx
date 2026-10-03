@@ -14,8 +14,10 @@
  * from the outside the splash simply lasts a little longer.
  *
  * The **Role lock** is the one thing the three apps disagree about: `appRole` is a build-time constant
- * handed in by the only app file that differs, and Settings reads it to decide whether this build has
- * a Role switcher at all. It defaults to `'both'`, so `apps/both` says nothing.
+ * handed in by the only app file that differs. Settings reads it to decide whether this build has a Role
+ * switcher at all, and the login form reads it to decide whether there is a Role to choose — which is
+ * what leaves Repairs Client and Repairs Pro with one login button and no picker. It defaults to
+ * `'both'`, so `apps/both` says nothing.
  */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
