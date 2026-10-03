@@ -26,19 +26,19 @@
 
 ## Workflow
 
-This is how I implemented the stack, features, and screens. I used AI-assisted development, but I was in front of the computer giving prompts, validating, testing, and requesting changes during the entire 10 hours of development):
+This is how I implemented the stack, features, and screens. I used AI-assisted development, but I was in front of the computer giving prompts, validating, testing, and requesting changes during the entire 10 hours of development:
 
-1 - Defined a product requirements document (PRD.md) with the stack, technical decisions, features and how to build it. I choose all the technologies based on my experience with React Native (use the same libraries we use on production), and I chose to add a monorepo so we can split the single app into 2 different apps inside the same repo and reuse code across them. I also choose to use react-native-web so we can also ship to react web if we decide too (it automatically converts react native components to react web components). A Claude Code agent helped me generate the PRD based on my architectural decisions and on the Turno Design system (color tokens) that I already had on this other project https://github.com/sagits/sweep-public.
-2 - Created an empty repo on github
-3 - Used a spec library to turn the PRD (that can also be read as a spec) into multiple tickets so we can use agents to implement each feature along with the e2e and integration tests. There are many AI libraries we can use for this like superpowers, GSD, Spec Kit, etc. I decided to use https://github.com/mattpocock/skills
-4 - Install https://github.com/mattpocock/skills skills locally on the project and follow its readme to configure it (it creates issues on the repo for the tickets we generate using it)
-5 - used /domain-modeling @PRD.md to generate some information about the PRD that would be shared across every agent that touches code on this repo
-6 - use /to-tickets @PRD.md. It showed me how it would break this PRD into tickets and asked me to review it. Once we decided how I want the tickets, the order, how many tickets, and I corrected any AI deviation, it created the tickets as issues on GitHub
-7 - I used /implement #1 to setup the structure of the project (it works on the first issue that was the project structure). I tested it to guarantee it works
-8 - I used /implement #5 to setup detox tests. Ai was going to do this later, but I prefer to do it first so we guarantee the e2e tests are working before we do anything else (we need to install detox, boot the simulator, if this breaks AI would try to generate the code without testing itself). I manually tested it to guarantee it was working
-9 - I used /implement-spec to implement the rest of the tickets on a single branch and tested the end result for any necessary changes
-10 - I prompted AI to add a login screen because it deviated from the login screen and added only two buttons to choose the user type on the app home (it was working, but didn't mimic what a real app would have)
-11 - Tested the entire app and made the necessary changes (on visual and code). Rerun detox tests and integration tests and asked AI to fix what broke after my changes
+1. Defined a product requirements document (PRD.md) with the stack, technical decisions, features and how to build it. I choose all the technologies based on my experience with React Native (use the same libraries we use on production), and I chose to add a monorepo so we can split the single app into 2 different apps inside the same repo and reuse code across them. I also choose to use react-native-web so we can also ship to react web if we decide too (it automatically converts react native components to react web components). A Claude Code agent helped me generate the PRD based on my architectural decisions and on the Turno Design system (color tokens) that I already had on this other project https://github.com/sagits/sweep-public.
+2. Created an empty repo on github
+3. Used a spec library to turn the PRD (that can also be read as a spec) into multiple tickets so we can use agents to implement each feature along with the e2e and integration tests. There are many AI libraries we can use for this like superpowers, GSD, Spec Kit, etc. I decided to use https://github.com/mattpocock/skills
+4. Install https://github.com/mattpocock/skills skills locally on the project and follow its readme to configure it (it creates issues on the repo for the tickets we generate using it)
+5. used /domain-modeling @PRD.md to generate some information about the PRD that would be shared across every agent that touches code on this repo
+6. use /to-tickets @PRD.md. It showed me how it would break this PRD into tickets and asked me to review it. Once we decided how I want the tickets, the order, how many tickets, and I corrected any AI deviation, it created the tickets as issues on GitHub
+7. I used /implement #1 to setup the structure of the project (it works on the first issue that was the project structure). I tested it to guarantee it works
+8. I used /implement #5 to setup detox tests. Ai was going to do this later, but I prefer to do it first so we guarantee the e2e tests are working before we do anything else (we need to install detox, boot the simulator, if this breaks AI would try to generate the code without testing itself). I manually tested it to guarantee it was working
+9. I used /implement-spec to implement the rest of the tickets on a single branch and tested the end result for any necessary changes
+10. I prompted AI to add a login screen because it deviated from the login screen and added only two buttons to choose the user type on the app home (it was working, but didn't mimic what a real app would have)
+11. Tested the entire app and made the necessary changes (on visual and code). Rerun detox tests and integration tests and asked AI to fix what broke after my changes
 
 
 
