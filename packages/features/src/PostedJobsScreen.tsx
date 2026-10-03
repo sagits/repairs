@@ -7,45 +7,27 @@ import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useClientJobs } from '@repairs/api';
-import { PEOPLE } from '@repairs/stores';
 import { colors, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job } from '@repairs/types';
+import { asDay, proName } from './jobText';
 
 /**
- * The Pro holding a Job, by name. There is exactly one Pro, so this is a lookup against the one person
- * rather than a directory — and it falls back to the id instead of to "Unknown", because an id on the
- * card is at least true. The API has no users endpoint we call and no assignee field, so a second Pro
- * would arrive with the store that invented them and this is where it would be read from.
- */
-const proName = (proId: string) => (proId === PEOPLE.pro.id ? PEOPLE.pro.name : proId);
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/**
- * The date read straight off the ISO string's own `YYYY-MM-DD`, rather than through a `Date` and a
- * locale. A `Date` would render in the device's time zone and an `Intl` format in the device's locale,
- * and both are things a Detox assertion and a Jest assertion would then disagree about on different
- * machines. A Local job's `createdAt` is written by this app in UTC, so reading UTC back is not a
- * simplification of the truth — it is the truth, formatted.
+ * One row, and the way into the Job. Three of its four lines are conditional, and every one of them is
+ * absent rather than faked when the Job has nothing to put there: a Server job has no timestamp anywhere in
+ * the API and no assignee, so it shows no date and no Pro. `PRD.md`'s My Jobs section argues that at length
+ * — an invented date is worse than a missing one, because a missing one is honest.
  *
- * ponytail: a month table rather than `Intl.DateTimeFormat`, because Hermes and Node abbreviate
- * months differently ("Sep" against "Sept") and the only thing a formatter would buy here is that
- * disagreement. If the app is ever localised, this is what it replaces.
+ * The whole row is the target rather than a chevron or a "View" link: the row *is* the Job, and a row that
+ * opens what it shows needs no second affordance to say so.
  */
-const postedOn = (createdAt: string) => {
-  const [year, month, day] = createdAt.slice(0, 10).split('-');
-  return `Posted ${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
-};
-
-/**
- * One row. Three of its four lines are conditional, and every one of them is absent rather than faked
- * when the Job has nothing to put there: a Server job has no timestamp anywhere in the API and no
- * assignee, so it shows no date and no Pro. `PRD.md`'s My Jobs section argues that at length — an
- * invented date is worse than a missing one, because a missing one is honest.
- */
-function PostedJobRow({ job }: { job: Job }) {
+function PostedJobRow({ job, onOpen }: { job: Job; onOpen: () => void }) {
   return (
-    <View testID={`posted-job-${job.id}`} className="rounded-card bg-surface px-4 py-4 shadow-card">
+    <Pressable
+      testID={`posted-job-${job.id}`}
+      accessibilityRole="button"
+      className="rounded-card bg-surface px-4 py-4 shadow-card"
+      onPress={onOpen}
+    >
       <View className="flex-row items-start justify-between gap-3">
         <Text testID="posted-job-title" className="flex-1 text-lg font-semibold text-ink">
           {job.title}
@@ -57,10 +39,10 @@ function PostedJobRow({ job }: { job: Job }) {
       ) : null}
       {job.createdAt ? (
         <Text testID="posted-job-date" className="mt-2 text-sm leading-5 text-inkMuted">
-          {postedOn(job.createdAt)}
+          Posted {asDay(job.createdAt)}
         </Text>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -227,7 +209,9 @@ export function PostedJobsScreen() {
           testID="posted-jobs"
           data={data ?? []}
           keyExtractor={(job) => job.id}
-          renderItem={({ item }) => <PostedJobRow job={item} />}
+          renderItem={({ item }) => (
+            <PostedJobRow job={item} onOpen={() => router.push(`/job/${item.id}`)} />
+          )}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
