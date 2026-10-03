@@ -14,10 +14,8 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { HeaderBand, Screen } from '@repairs/ui';
 import { useLocalJobs, useSession } from '@repairs/stores';
-import type { Role } from '@repairs/types';
+import { ROLE_LABELS, type Role } from '@repairs/types';
 import { useAppRole } from './appRole';
-
-const ROLE_LABELS: Record<Role, string> = { client: 'Client', pro: 'Pro' };
 
 const THE_OTHER_ROLE: Record<Role, Role> = { client: 'pro', pro: 'client' };
 

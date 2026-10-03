@@ -870,3 +870,512 @@ failing on a 30-second matcher for a row that was never on screen.
 Reordering is the whole fix, and it generalises: **a test that arrives somewhere by deep link cannot be
 relied on to leave.** Put it last, or relaunch after it. `#6`'s guard spec gets away with it because a
 redirect is what it is asserting, so the link's destination is a screen the app chose.
+
+## The fixtures bridge gained a second parameter, naming a method rather than an id
+
+`#8` and `#9` both recorded the same gap from opposite sides: `apps/both/fixtures.ts` reaches the fixture
+server's seeded failure by rewriting a **URL**, so a failure that lives in a request body — a create's
+`userId` — or in a request with no id in it at all cannot be reached from a device. `#8`'s failed create and
+`#9`'s failed cancel were both driven in Jest for that reason, and `#8` estimated the fix at two lines.
+
+`#10` is the ticket that needed it, and it is two lines. The Pro's available list is
+`GET /todos?limit=20&skip=0` — there is no id in it to poison, so `?fixtureUser=9001` cannot make it fail,
+and that is an **error state with a Retry** in this ticket's acceptance criteria. So there is now a second
+parameter on the same deep-link channel:
+
+```
+device.openURL({ url: 'repairs:///?fixtureFail=GET' })   // every read 500s
+device.openURL({ url: 'repairs:///?fixtureFail=PUT' })   // every claim and completion does
+device.openURL({ url: 'repairs:///?fixtureFail=' })      // back to a working server
+```
+
+**It is still one failure in the fixtures, reached a second way.** The implementation drops the seeded id
+into the path — every endpoint's URL begins `/todos` — and the fixture server's existing poisoned-id check
+answers the 500 in its own words. A `failNext()` switch, or a second failure mode in the fixture server,
+would have been a second thing to keep in step with the first; this is the same rewrite as `?fixtureUser=`
+pointed at a different part of the request.
+
+**Neither `#8`'s nor `#9`'s Jest test was rewritten to use it.** Both drive a real request through a real
+screen and assert the rollback, which the device cannot see — a device can only see the card. The entries
+recording why they are in Jest stand; what changes is that the *device* half is now possible, and `#11` and
+`#12` take it.
+
+## Available jobs' paging is asserted on the hook and on the device, and deliberately not at the screen
+
+`AvailableJobsScreen.test.tsx` asserts the rows, the posting Client, the error card and the empty state, and
+says nothing at all about paging. That is not an omission.
+
+**A `FlatList` under React Native Testing Library renders `initialNumToRender` rows and never lays out.** So
+the rendered rows are the first ten of sixteen, a row from page two is never mounted however the next page is
+triggered, and `onEndReached` is not a prop on any host element a query can reach — it belongs to
+`VirtualizedList`'s scroll handling. Every assertion available at that seam would be about the virtualisation
+window rather than about the list. The three claims that matter are asserted where they are facts:
+
+- **the stopping rule**, in `useJobs.test.tsx`, driven to the end of the real dataset: thirteen pages, a
+  fourteen-row last page, then `hasNextPage === false` and 217 open rows out of 254. A rule that multiplied a
+  page number by a page size, or that stopped on the first short page, stops in the wrong place here.
+- **a Local job appearing exactly once across three loaded pages**, in the same file, which is the trap
+  `applyOverlayToPages` exists for and the one thing a single-page list cannot show.
+- **the scroll itself**, in `pro-available.e2e.ts`, where a real list really scrolls — to a row that can only
+  have come from page two, then back to one from page one, which is what "the list never blanks between
+  pages" means when the pages are real.
+
+**The empty state is driven in Jest and not on the device, for a different reason.** `GET /todos` answers 254
+rows by design — the dataset's size is what makes thirteen pages a fact rather than a fixture — so an empty
+available list means handing the app a different dataset, which is a bigger lie than the one parameter it
+would need. The screen test wraps `fetch` one layer outside the fixture server and answers an empty
+envelope, which is the same seam `JobDetailScreen.test.tsx` uses to fail a single verb.
+
+**Rows are matched by `testID` and never by title, in both seams.** The fixtures derive a title from
+`id % 12`, so every twelfth row reads the same sentence and `by.text(…)` matches twenty-one elements once
+three pages are loaded — which Detox fails rather than ignores. The id is the only unique handle a row has.
+
+## A mutation cannot live inside the row it is about, because the optimistic write unmounts it
+
+The first draft of the available list put `useClaimJob` in `AvailableJobRow`, one per row, so that each row
+could carry its own spinner and its own error card. It cannot work, and the way it fails is worth recording
+because every optimistic list in this app has the same shape.
+
+`claimJob` writes the store **before** the request goes out. `availableScope` reads a status that write has
+just changed, `select` re-runs, and the row is dropped within the tick — taking the mutation inside it along.
+When the request then fails and the rollback puts the row back, it comes back with a *fresh* `useMutation`
+that has never heard of the failure, so `claim.error` is `null` and the card never renders. The test for it
+failed on exactly that: the rollback was correct in the store and invisible on screen.
+
+The mutation therefore belongs to the thing that outlives the row, which is the screen. The failed claim's
+card renders in the list's header, above the rows, which is also what "an inline error appears above it"
+means on a list whose rows come and go.
+
+## The claim's pending state has nowhere to show on the available list, and the muted tint has nowhere at all
+
+`#11`'s acceptance criteria ask that "while the request is in flight the button spins and the affected row
+takes a muted tint", and `PRD.md`'s states table says the same. Driving it found that the two halves of that
+sentence fight the optimistic write, in two different ways.
+
+**The spinner.** On the available list the affected row is *gone* before a frame could render it, for the
+reason above — so a spinner there would be markup nobody ever sees. The screen where it is real is
+`JobDetailScreen`, because the Job stays on screen through its own claim: the branch reads
+`job.status === 'open' || claiming`, which keeps the Claim button present and spinning until the request has
+settled either way. Without that `|| claiming` the button vanishes on the optimistic write and the failure has
+nothing to roll back to. The disabled state is asserted beside it and matters more than the spinner: a second
+press would reach the store's guard and come back with "That job is no longer open", which is a confusing
+thing to say to someone who tapped the same button twice.
+
+**The muted tint is asserted in neither seam, and cannot be.** NativeWind resolves `className` into native
+styles and leaves neither a `className` nor a `style` prop on the rendered node, so there is nothing for a
+React Native Testing Library query to read; Detox has no matcher for opacity. The tint is in the code, on the
+Job card during a claim and on a claimed row during a completion, and it is checked **by eye** — which is
+where `PRD.md` already puts the whole visual layer, against `reference/`. Recorded so the gap reads as a
+decision rather than an oversight.
+
+## Claimed jobs is the one screen that asks for nothing, so its test counts requests
+
+`ClaimedJobsScreen` reads `claims` out of the Local job store, filters on the signed-in Pro, and lays each
+record back over its own snapshot with `overlayClaim` — the same function the lists and the detail use, so a
+claimed Job reads `Claimed` here for the same reason it does everywhere else. There is **no query at all**.
+
+That makes `fetchCount === 0` the load-bearing assertion in `ClaimedJobsScreen.test.tsx`, and the reason the
+counter is wrapped around `fetch` for every test in the file rather than for one: the rows, the `proId` filter
+and the empty state would all be just as true of a screen that quietly fetched. On the device the same claim is
+made by **restarting the app** — a relaunch empties the react-query cache, nothing has been asked for, and the
+row is still there out of the snapshot. A patch-shaped claim record would render an id and nothing else.
+
+Three things follow from having no query, and all three are absences on purpose: **no skeleton, no pull to
+refresh and no error state.** A local read has none of those states to be in. It is also a `ScrollView` rather
+than a `FlatList`, because the list is bounded by how many Jobs one person has taken rather than by a dataset.
+
+`TabPlaceholders.tsx` is gone with it, renamed to `JobsHomeScreen.tsx` and down to the Role branch alone —
+the last placeholder in the app became a real screen in this ticket. Both `login.e2e.ts` and `settings.e2e.ts`
+had to stop waiting on a sentence that no longer exists, which is the third and last time that edit was needed.
+
+## A Job another Pro holds can only be reached in Jest, because there is exactly one Pro
+
+`#12`'s acceptance criteria and `PRD.md`'s requirement 10 both turn on a Job **somebody else** holds offering
+nothing at all. On a device that state is unreachable, and not for want of trying: there is one Pro per Role by
+design, `PEOPLE.pro` is the only one, and a second Pro's claim record can only be written by setting the store
+directly. The fixtures bridge rewrites *requests*, so it cannot help — and seeding a claim through a `__DEV__`
+deep link was already considered and rejected by `#9` as a backdoor into the production store.
+
+So the branch is asserted in two halves. `JobDetailScreen.test.tsx` drives a claim by `pro-someone-else` and
+asserts that both the Claim and the Mark as done are absent; `pro-mine.e2e.ts` asserts the **done** half of the
+very same branch on a device, on a row and on the detail behind it, after really completing a Job. The store's
+guard — `Only the Pro holding a job can complete it`, with nothing sent — is asserted against the real store in
+`useJobs.test.tsx`, which is where the rule actually lives.
+
+## The fixtures deep link navigates to `/`, which only matters now that a spec drives it from another tab
+
+`?fixtureUser=` and `?fixtureFail=` are delivered as deep links to `repairs:///?…`, and Expo Router routes that
+to `/`. Every spec that used the bridge until now drove it from a screen that **is** `/` — the Client's posted
+jobs, the Pro's available list — so the navigation was a no-op and `fixtures.ts`' comment could truthfully say
+the link "lands on `/`, which is the tab the link is driven from".
+
+Claimed jobs is `/mine`. The first draft of its rollback test opened the link and then tapped a button on a tab
+it was no longer on, failing with "No elements found" on a button that was plainly in the code. The fix is one
+line — tap the tab again after the link — and it is written down because the next spec on a non-`/` screen will
+hit it too, and the symptom points at the button rather than at the link.
+
+## A group of rows is waited on for existence, not for visibility
+
+Claimed jobs renders two groups, each a `View` holding a heading and its rows. `toBeVisible` fails both of them,
+for two reasons at once: the entry above about transparent layout views, and Detox's 75% threshold, which a
+group drops below the moment an error card appears above it and pushes it down the screen. Both failures look
+like the group is missing.
+
+So the group's `testID` is waited on with `toExist`, which is the structural claim actually being made — "there
+is a done group now" — and what has to be *seen* is read off a row: the status pill, matched `withAncestor` its
+own row rather than as whichever pill Detox found first. The negative stays `not.toExist()`, which was never
+affected.
+
+## The live spec fences itself off in Node, and the obvious way to read `EXPO_PUBLIC_API` there breaks the file
+
+`PRD.md:833` says "one spec, `live.e2e.ts`, runs against the real DummyJSON" and leaves open the thing that
+actually needs deciding: what that spec does during the other runs. It cannot simply sit in `e2e/` and be run
+by hand, because `pnpm e2e:test` with no arguments picks up every `*.e2e.ts` and would run it against the
+fixtures bundle — green, and lying, which is the one outcome this ticket exists to prevent.
+
+So the spec reads `EXPO_PUBLIC_API` **in the Detox runner's own process** and is a `describe.skip` unless it
+is `live`. `scripts/e2e-test.sh` already exports the value it decided on, so there is one source of truth and
+no second flag to keep in step. A default run now reports **38 passed, 3 skipped**, and the skip carries its
+reason in the `describe` name, because that is the only string the reporter prints.
+
+**`process.env.EXPO_PUBLIC_API` is the spelling that does not work, and it fails in a way that points
+nowhere near itself.** The e2e specs are compiled by the app's `babel.config.js`, and `babel-preset-expo`'s
+`inline-env-vars` rewrites any `process.env.EXPO_PUBLIC_*` member expression into a read against
+`expo/virtual/env`, injecting the import. That module is ESM inside `node_modules`, which the Detox Jest
+project does not transform, so the whole file dies at parse time with `SyntaxError: Unexpected token 'export'`
+reported **against line 2 of the file's own comment block**. Nothing in that message mentions environment
+variables.
+
+`const { EXPO_PUBLIC_API } = process.env` looks like the fix and is not: Babel's own destructuring transform
+rewrites the pattern into exactly the member expression the plugin is watching for, in the same traversal, and
+the injected import comes straight back — confirmed by reading the transform output, not by guessing. What
+works is an alias, `const nodeEnv = process.env`, because then the member expression's object is a plain
+identifier and the plugin's `process.env` test does not match. Any future e2e spec wanting an `EXPO_PUBLIC_*`
+value needs the same two lines. This is the mirror image of the entry above about the flag being read in the
+app rather than in `packages/`: there the rewrite is what we want and `expo` resolving is the problem, here
+`expo` resolves fine and the rewrite is the problem.
+
+**An upstream failure is checked for before the app is launched, which is how it ends up legible.** A third
+party going down, rate-limiting us or reshaping its dataset would otherwise surface as "Timed out while
+waiting for expectation", which is indistinguishable from a bug in the app. So `beforeAll` reads
+`GET /todos/user/13` and `GET /todos/9999` from Node and fails with a message that names DummyJSON, names the
+URL, prints what came back, and says in its first line that no other spec is affected. Verified by pointing
+the base URL at `dummyjson.invalid`: all three tests fail in milliseconds, the app is never launched, and the
+message is the one above.
+
+That check is also where the expected titles come from. They are read over a second, independent connection
+rather than written into the spec, so the assertion is "the screen shows what the server served" rather than
+"the screen shows six strings somebody typed in October". The **counts** stay written down, because those are
+`ADR 0004`'s claim rather than an observation — and the ADR is what has to be re-verified and re-recorded if
+the live dataset ever moves, rather than the spec being adjusted until it passes.
+
+**`ADR 0004` was re-verified against the live API as part of this, and it holds exactly.** `GET /todos/user/13`
+answers `total: 6`, with ids `2` and `183` completed and `21`, `76`, `82`, `86` open — four open Jobs and two
+done ones on a cold install, which is what the ADR records. The live titles are the dataset's own
+("Memorize a poem", "Create a compost pile", …) and bear no resemblance to the fixtures' repair-shop strings,
+which is what makes the first test unable to pass against the wrong bundle.
+
+**Both directions were asserted, which is this repo's standing rule for a green E2E claim.** Besides the
+unreachable-host check above, the guard was forced open and the spec run against the **fixtures** Metro: it
+failed on `posted-job-2` never existing, because the fixtures give user 13 different ids. So the spec is
+genuinely coupled to the live data and the skip is the only thing keeping it out of the default suite — not a
+spec that would have passed either way.
+
+**The write path is deliberately untouched.** `updateTodo` has never been run against `PUT /todos/{id}` on the
+real 254-row dataset, and this spec is read-only by its ticket's own wording, so it stays that way. It reads a
+list, reads one record, and reads a 404; it writes nothing, persists nothing, and leaves no state for the next
+spec to trip on.
+
+## The three-app split is deferred, so `ADR 0003` now describes a plan rather than the code
+
+Renato deferred **#13 — "Repairs Client and Repairs Pro, with parity enforced"** on 2026-10-03, part way
+through the run, and the issue is commented and left open rather than closed. Nothing was built and nothing
+was removed: `apps/client` and `apps/pro` were never created, `scripts/check-app-parity.mjs` does not exist,
+and no `check:apps` script was added.
+
+The groundwork that is already in the tree stays, and is still right: `appRole` as a prop on `AppProviders`
+with a context behind it, `RoleGuard`, and the rule that an `apps/*/app/` file is a route and a re-export and
+nothing else. Its payoff is simply not demonstrated.
+
+**`ADR 0003` is therefore the one ADR the code no longer satisfies**, and that matters more than it sounds,
+because the ADR's own rejected option is "one app, `apps/both`, and a paragraph in the README claiming the
+code would support splitting — rejected: the claim is the whole point, and an unexecuted claim is worth
+nothing." That is exactly the position this repo is now in. So the README does not write that paragraph in
+any form, not even as a "coming soon": it names the deferral, points at issue #13, and says nothing about
+what the layout would support. The ADR is left as written rather than edited, because an ADR records a
+decision at a date and this entry is what records that the decision outran the build.
+
+## The web target is deferred too, and it takes a visible product gap with it
+
+**#14 — "The web target: static export, sidebar at `md:`, Vercel"** was deferred on 2026-10-03 alongside
+#13. Commented, left open, nothing built, nothing deleted. `react-native-web` and `react-dom` stay in
+`apps/both/package.json`, the `build:web` scripts stay in the app and the root `package.json`, and the
+`build:web` task stays in `turbo.json` with `outputs: ["dist/**"]`. **None of it has ever been run**, so
+`pnpm build:web` is unverified rather than working, and nothing has been deployed anywhere.
+
+The part worth separating out is that one of that ticket's criteria was never web-only: "at `md:` and above
+the tab bar is a left sidebar with content centred" was to be written in responsive classes, so a wide tablet
+got it on native too. Deferring the ticket leaves `RoleTabBar` a bottom bar on every device. **That is a
+product gap, not only a missing platform**, and the README names it as one.
+
+`PRD.md:878-886` describes the static export, `web.output = "static"` and the Vercel rewrite for `/job/:id`
+as though they are done. They are not, and the stack verification already recorded that the PRD's rewrite is
+not how Expo documents dynamic routes under `output: "static"` — so whoever builds this starts by checking
+that, not by trusting the spec.
+
+## Every commit carries a co-author trailer, against an explicit requirement, and the history is left alone
+
+`PRD.md`'s deliverables section and **#16 — "README, PROMPTS.md and DECISIONS.md"** both require that every
+commit be authored by Renato Probst and by nobody else: "no `Co-Authored-By:` trailer, no `Generated with`
+line, no tool attribution of any kind … This overrides any default attribution behaviour the implementing
+agent has been configured with. `PROMPTS.md` is where the use of AI is disclosed, in full and on purpose; the
+commit log is not."
+
+**That requirement was not met, and this entry is the record of why.** It lives in the spec's deliverables
+section and in the last ticket of sixteen, so it was read when that ticket was picked up — by which point 55
+of the 58 commits on `spec/repairs-mvp` carried
+`Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`, and `main` had been pushed to `origin`
+with 50 of them. The orchestration notes every implementer worked from had instructed the trailer explicitly,
+which is how it ended up on all but the three earliest commits rather than on some.
+
+The choice offered was a history rewrite — `filter-branch` or `filter-repo` over the fifty-nine commits then
+in existence, then a force-push over a pushed `main` — or leaving the history and recording the deviation.
+**Renato chose to leave the history.** So:
+
+- **No rewrite and no force-push.** Rewriting a pushed branch to satisfy a metadata requirement risks the one
+  thing the requirement exists to protect, which is a readable, trustworthy history.
+- **The trailer stays on the commits made after the discovery too**, including this ticket's. Switching
+  spelling part way through would leave a history that is half-cleaned, which reads like an abandoned attempt
+  and is harder to explain than a uniform convention with an entry against it.
+- **The halves of the requirement that did hold, held.** The author is `Renato Probst` on every commit in the
+  history, and there is no "Generated with" line anywhere in it or in any PR description.
+
+The requirement's own rationale is the fairest thing to measure the outcome against: `PROMPTS.md` is where
+the use of AI is disclosed, in full and on purpose, and it is — twenty-five entries, including the
+corrections. The commit log now discloses it a second time, which is not what was asked for. Recorded as
+unmet rather than quietly tidied.
+
+## `main`'s README is the Client-only half, and this branch's one supersedes it on the merge
+
+`main` got a README part way through the run, deliberately scoped to what was working at that commit: the
+Client's list, posting, cancelling, the fixture server and the two commands each suite needs, with the Pro's
+flow, the role-locked builds and the web target left out because they were planned rather than built. That
+was the right README to write then — one that describes plans is one nobody can trust about the parts that
+are real.
+
+`spec/repairs-mvp` then built the Pro's flow, so the same file is rewritten here rather than written fresh:
+every section of `main`'s version survives, with claiming and completing, the verified requirement table and
+the gaps added on top. It is the one file where `main` and this branch both moved, so the merge conflicts.
+
+**Correction, written at the merge: "keep this branch's version whole" is no longer the resolution.** That
+sentence was written when `main`'s README was the one commit `5ee9511` wrote. Renato then edited the file
+directly on `main` in four more commits (`b0ef4bb`, `a301348`, `3e87267`, `22905a1`) and said "I made some
+changes, dont remove them". `main`'s README stopped being a subset of this branch's at that point: it has his
+intro bullets, his `## Architecture` list, and a `## Workflow` section that is his own first-person account of
+the ten hours, including which skills he used and why. None of that exists on the branch and none of it could
+be regenerated from it.
+
+So the conflict is resolved by **reconciling the two, with his text as the base wherever they overlap**: his
+bullets, `## Architecture` and the whole of `## Workflow` kept verbatim and not edited at all, not even by
+`/humanizer`; his `## Running it` and `## Where the design lives` kept as his with only the corrections this
+branch earned folded in (the `--filter` spelling of `e2e:metro`, which has no root alias, the warm-Metro
+rule, the live-API command, and the counts); and the branch's `## What it does`, `## The fixture server`,
+`## Where it stands`, `## What is honestly missing` and `## What more time would buy` added underneath. The
+branch's `## The libraries, and why each one` is dropped, because his `## Architecture` covers that ground in
+his words and two library sections would disagree with each other. `## The shape of it` loses its heading and
+keeps its contents. A straight `git checkout --ours`, or `--theirs`, would have lost one author's work either
+way.
+
+Worth noting for the next person who writes one: the README is the only document in this repo that has had to
+be *reduced* in scope to stay honest and then grown back. `DECISIONS.md` and `PROMPTS.md` only ever grow,
+because an entry is true of the moment it was written. A README is in the present tense, and that is what
+makes it the document most likely to be quietly wrong.
+
+## The Role picker becomes a credential form, so issue #2's acceptance no longer describes how you sign in
+
+Asked for directly on 2026-10-03, after the sixteen tickets were done, against a mockup Renato supplied.
+It has no issue of its own; this entry and its commits are the record.
+
+**Issue #2's acceptance said "Picking a Role signs you in as that Role's hardcoded person". That is no
+longer true.** `LoginScreen` is an email field, a masked password, a Show Password link, a Client/Pro
+switch and a Login button. What *is* still true is the half that matters: there are still exactly two
+hardcoded people, and which one you become is still decided by a Role and nothing else — the switch has
+simply taken the two buttons' job.
+
+**The validation is deliberately the thinnest thing that counts as validation**: `LoginSchema` asks that
+the email look like an email and the password be non-empty, and that is the whole check. There is nothing
+to check a credential *against*, so any valid-looking pair signs you in. Anything more would be the form
+claiming an authority it does not have.
+
+**Neither the email nor the password is stored.** `handleSubmit` reads both and drops them; `useSession`
+still persists only the Role and still rebuilds the person from it on every launch, which is an earlier
+entry's invariant and the one thing this change was most able to break. `LoginScreen.test.tsx` asserts it
+against AsyncStorage directly rather than against the store, because a store that has forgotten the email
+is not the same claim as an email that was never written down.
+
+**Three deviations from the mockup, all deliberate:**
+
+- **The field is labelled "Email", not "Username".** The mockup says Username and the validation says
+  email, and a field that rejects a username for not being an email address is a field lying to the person
+  filling it in. One of the two had to move and the label was the cheaper one. **Overrulable in one line**
+  — change the label and `LoginSchema`'s `email` to a non-empty string together, or this reverses into the
+  same lie.
+- **The colours are ours.** The mockup is blue throughout; the palette is mint. `primary` for the Login
+  button, `ink`/`inkMuted` for text and placeholders, `border` for the field outlines, `danger` for the
+  messages. `accent` `#1E68BF` — the one blue we own — is spent on the Show Password link, because reading
+  as a link is that control's entire job. `#007AFF` appears nowhere.
+- **No icons.** The mockup's person and padlock glyphs need `@expo/vector-icons`, which is deliberately not
+  installed, for the same reason the tab bar still carries labels and no icons. A glyph is not worth a
+  native module and the `pnpm e2e:build` that would come with it.
+
+**The Role is a segmented pair rather than a boolean `Switch`**, which was the other reading of "a switch
+that chooses Client or Pro". React Native's `Switch` is less code and was considered first, but it has an
+off state and an on state, so it would have had to nominate one Role as the default and the other as the
+deviation from it. The two Roles are symmetric — they are what two equal buttons used to be — and a
+segmented pair keeps both of them on screen and selectable. It sits *above* the Login button, because
+everything the press depends on belongs above the thing you press.
+
+## `FormField` moves into `@repairs/ui`, because the second form arrived
+
+This supersedes "The new-job form keeps `FormField` local and drops the debounce, both against `PRD.md`",
+and it supersedes exactly the half that entry hedged: "**If a second form ever arrives, that is the move:**
+lift it to `packages/ui`, add `react-hook-form` to that package's peers, and the call sites do not change."
+The login form is that second form, so that is what happened, and the entry's prediction held — the call
+sites gained one prop each and changed nothing else.
+
+The argument for keeping it local was never that a shared field component is wrong, it was that a design
+system should not acquire a React Hook Form dependency for a single consumer. Two consumers is a different
+sentence. The error treatment is now one declaration again instead of two that drift, which was `PRD.md`'s
+point in the first place.
+
+Two things changed in the lift. It is **generic over the form's values** (`FieldValues`, `FieldPath`)
+rather than typed to `NewJobInput`, which would have made it a new-job component living in the wrong
+package. And **`testID` is a prop** rather than derived from the field name: the ids are what the Detox
+specs drive, and two forms both minting `field-${name}` would collide the first time they shared a field
+name. The pass-through props it gained — `secureTextEntry`, `keyboardType`, `autoCapitalize`, `autoCorrect`
+— are only the ones the two call sites actually use; `autoCorrect` in particular is a prop rather than a
+blanket `false` so that lifting the component did not silently change the new-job form's typing behaviour.
+
+The debounce half of the superseded entry still stands untouched. Nothing about a second form makes a
+timer around a draft write earn its keep.
+
+## A masked password reads its real text back to Detox, so the reveal is asserted in Jest
+
+The obvious device assertion for Show Password is `toHaveText` on the password field, masked and then
+revealed. It was written that way first, and then checked in the opposite direction — the technique that
+caught the deep-link hole in `#6` and the reset-link no-op in the harness entry. **It does not work.** iOS
+hands Detox the field's real characters whether or not `secureTextEntry` is on, so
+`expect(element(by.id('login-password'))).toHaveText('hunter2')` passes while the screen is plainly showing
+bullets, and `not.toHaveText` fails against a masked field. Nothing Detox can see distinguishes the two
+states: the `secureTextEntry` prop is not exposed, and both states are the same native class.
+
+So the two halves of the behaviour are asserted in the two places that can see them. `login.e2e.ts` taps the
+link and asserts it says what state it is in — `Show Password` becoming `Hide Password` and back — which is
+the control working. `LoginScreen.test.tsx` reads `secureTextEntry` off the input and asserts it flips, which
+is the masking. **Anyone reaching for `toHaveText` here again will get a green test that proves nothing**,
+which is the whole reason this is written down.
+
+## Signing in became four `testID`s, so it is one shared Detox module instead of eight copies
+
+Every spec in the suite signs in and none of them is about signing in. That was one `tap()` per spec when the
+screen was a picker; it is two `replaceText`s, a conditional tap on the Role switch and a submit now, which is
+eight places to edit the next time the form moves a control. So `apps/both/e2e/sign-in.ts` holds `signIn(role)`
+and the `LOGIN_FORM` id, and the seven specs whose subject is something else import it. `login.e2e.ts`
+deliberately does **not**: that spec is about the form, so it spells out every step, because a helper there
+would hide the thing under test.
+
+Each spec keeps its own `VISIBLE_WITHIN` and `waitForVisible`. Those are each spec's own statement about what
+it waits for and how long that is worth, and the shared module has no business overriding them — it exports an
+id to wait on, not a wait. `jest.config.js`'s `testMatch` is `*.e2e.ts`, so a helper file beside the specs is
+not picked up as one.
+
+**`replaceText`, not `typeText`, for both fields**, here and in `login.e2e.ts`. iOS autocorrect rewrites a
+part-typed word when the field loses focus, which against an email field is the difference between a green run
+and a mysterious "Enter a valid email address". `typeText` stays where the keystroke itself is the assertion,
+which is `new-job.e2e.ts`'s "says nothing about a short title while it is being typed" and nowhere on this
+screen.
+
+## The `You` row label is deleted, because one person holds one Role and only a Pro reaches that list
+
+`#10`'s criterion reads "Rows read `Client #N`, or `You` for a job the current Client posted", and
+`AvailableJobsScreen` implemented it as `job.clientId === user?.id ? 'You' : …`. **The branch could not
+fire.** `JobsHomeScreen` renders that screen only when `role === 'pro'`, a Pro's `user.id` is the string
+`pro-1` and a Job's `clientId` is the API's number, and `GLOSSARY.md` says what makes that permanent: one
+Role at a time. The PRD asked for a label the Role split forbids.
+
+`AvailableJobsScreen.test.tsx` was reaching it by signing in as a **Client** and rendering the Pro's screen —
+a state the app cannot produce — then posting a Job in-app so a `clientId` would match. So the choice was
+between deleting the branch and keeping a test that manufactures an impossible Role. **The branch is
+deleted**, along with the `postingClient` helper, the row's `user` prop and the screen's `useSession` read;
+the test keeps its first half, which is the real assertion that a row names its Client by id.
+
+Keeping it and fixing the test was considered and there is nothing to fix it *to*: every honest way to reach
+the branch requires a person who is a Client and a Pro at once. This repo has already thrown out two
+assertions for exactly that reason — the deep-link spec that passed against a link that never arrived, and
+`toHaveText` on a masked password, which passes while the screen shows bullets. A test that signs in as the
+wrong Role is the same failure one layer up: green, and about nothing.
+
+**What survives is the honest half of the requirement.** `JobDetailScreen` still says `Posted by you`, and
+there it is reachable and asserted in both seams — a Client does open their own Jobs. If a second Role ever
+sees the available list, or one person holds both Roles, this is three lines to put back; the deletion is
+what keeps the suite from claiming it already works.
+
+## The review's four extractions, applied with this repo's own test, and the two that were declined
+
+`/code-review` found six duplications. The test is `DECISIONS.md`'s own, from the second in-app confirm: a
+shared thing has to be smaller than its interface, and two callers earn a file where one did not.
+
+**Taken.** The two failure titles two screens each have to word identically (`jobText.ts`, which already
+exists for exactly this). The error card, which turned out to be **five** near-copies rather than the four the
+review found — three load errors with a Retry, `JobActions`' `ActionError` which was that card without one,
+and `NewJobScreen`'s `PostJobError`, which nobody had noticed because it is the one error card on a screen
+with no list on it. All of them are `ErrorCard` in `@repairs/ui` now: three props and an optional `retry`,
+seven call sites. The glyph frame, four copies of one `className` with the "there is no
+icon font in this build" paragraph pasted above three of them — now `GlyphFrame`, two props, and the paragraph
+once. `ROLE_LABELS`, which was a `Record<Role, string>` in Settings and an array of `{ role, label }` in the
+login form: the same two words, twice, in two shapes, now beside the `Role` type with `ROLES` derived from it.
+
+`ErrorCard` left `JobActions.tsx` rather than growing a `retry` prop in place, because a card reporting
+"Could not load your jobs" has no business being imported from a file named for actions. `ActionButton` stays:
+it really is about an action, and the paragraph arguing why these two were one file is now that file's only
+subject.
+
+**Declined, with reasons, because a declined finding is worth more on the record than silence.**
+
+- **The two-bar glyph body in `AvailableJobsScreen` and `ClaimedJobsScreen`**, which are byte-identical. With
+  the frame shared, what is left is two `View`s. How many bars an empty state draws is part of what it means —
+  posted jobs draws three — so the picture stays with the screen and only the frame around it is shared.
+- **`EVERY_WRITE_FAILS` and `A_WORKING_SERVER`, duplicated in `pro-available.e2e.ts` and `pro-mine.e2e.ts`.**
+  `resetToTheLoginForm` moved into `sign-in.ts` because getting to a known starting state is what every spec
+  does and none of them is about. Seeding a fixture failure is the opposite: it is each of those two specs'
+  **subject**, and the two lines sit next to the assertion they stage. A third module beside the specs for two
+  string literals costs more reading than it removes, and the drift it would prevent is loud — a spec whose
+  seeded failure stopped arriving fails on its own next assertion.
+
+**And one flattening that was not an extraction.** `JobDetailScreen`'s Pro branch was a four-deep ternary
+inside the JSX. The review suggested two components; it is two named conditions above the `return` and two
+flat lines in the markup instead, because a component would have had to be handed the two mutations the
+screen owns — which is the thing the branch's own comment explains it must not do. `!claimable` on the second
+condition is the precedence the nesting used to carry: mid-claim both are true at once, and without it a
+second button appears under the spinning first one.
+
+## The four ADRs get status markers, which is not the edit the deferral entry ruled out
+
+`ADR 0003` describes `apps/client`, `apps/pro` and `scripts/check-app-parity.mjs` in the present tense, and
+none of them exists. `README.md` and the deferral entry above both say so, but **an ADR is authoritative and
+gets read on its own**, so a reader who opens `0003` first is told the split ships.
+
+The deferral entry said the ADR was "left as written rather than edited, because an ADR records a decision at
+a date". That still holds and is what this does: the reasoning, the consequences and the "Considered options"
+are untouched — including the rejected option calling an unexecuted claim worth nothing, which is now this
+repo's own position and reads better for being left alone. What is added is a status block above the body.
+
+All four get one, so that a missing marker never has to be interpreted:
+
+- **0001** — implemented, except that **`reference/` was never committed**, which the ADR asserts as the thing
+  layout is checked against. The README already recorded it; the ADR did not.
+- **0002** — implemented in full.
+- **0003** — accepted, **not implemented**, deferred by **#13**.
+- **0004** — implemented, with one sentence drifted: "picking a Role signs you in" was true of the Role
+  picker that `#2`'s login form replaced. The id-13 decision the ADR is about is untouched, so the sentence
+  is annotated rather than rewritten.

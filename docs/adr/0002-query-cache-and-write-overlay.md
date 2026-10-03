@@ -1,5 +1,9 @@
 # The query cache holds only what the server said; local truth is overlaid at read time
 
+> **Status: accepted 2026-10-02, implemented.** Every part of this is in the tree: the invariant, both
+> scopes, the claim record, the snapshot and the `select` overlay. It is marked so that a marker's absence
+> on one of these four ADRs never has to be guessed at — `0003` is the one the code does not satisfy.
+
 The upstream API accepts writes and does not persist them, and it has no field for an assignee,
 a description or a timestamp. So three things we need — claimed as a status, which Pro holds a
 Job, and Jobs created in the app — cannot come from the server at all. Rather than patch them

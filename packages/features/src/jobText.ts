@@ -1,7 +1,8 @@
 /**
- * The two strings about a Job that more than one screen has to get right the same way: the Pro's name, and
- * a date. Both were local to `PostedJobsScreen` until the detail screen needed them too, which is what
- * earned them a file — one caller would not have.
+ * The strings about a Job that more than one screen has to get right the same way: the Pro's name, a date,
+ * and the titles of the two failures that can be reported from two places. The first two were local to
+ * `PostedJobsScreen` until the detail screen needed them too, which is what earned them a file — one caller
+ * would not have, and that is still the line this file is drawn on.
  */
 import { PEOPLE } from '@repairs/stores';
 
@@ -29,3 +30,13 @@ export const asDay = (isoDate: string) => {
   const [year, month, day] = isoDate.slice(0, 10).split('-');
   return `${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
 };
+
+/**
+ * The two failure titles two screens each have to word identically. A claim can fail from the available
+ * list or from the detail screen, and a completion from the claimed list or from the detail screen, so each
+ * of these sentences has two call sites and a Detox assertion waiting on its exact text. The ones that
+ * stayed in their screens — `Could not cancel this job`, and the three `Could not load …` titles — have one
+ * caller each, which is the same test `proName` and `asDay` passed to get here.
+ */
+export const CLAIM_FAILED = 'Could not claim this job';
+export const COMPLETE_FAILED = 'Could not mark this job done';

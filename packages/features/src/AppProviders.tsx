@@ -8,7 +8,7 @@
  *
  * The **hydration gate** holds the first frames of a launch. Both persisted stores are read back
  * asynchronously, and until they are, each honestly reports its initial state when what it means is
- * "not yet asked": the session says "signed out", which flashes the Role picker at someone already
+ * "not yet asked": the session says "signed out", which flashes the login form at someone already
  * signed in, and the Local job store says there are no claims, which renders a Job a Pro holds as open.
  * Nothing renders until both answers are real. The holding view is the launch screen's own white, so
  * from the outside the splash simply lasts a little longer.

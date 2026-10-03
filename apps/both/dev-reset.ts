@@ -1,6 +1,6 @@
 /**
  * `repairs:///?reset=1` — the dev-only way to put the app back to "nobody has ever used this", so a
- * spec can start from the Role picker without the app being uninstalled first.
+ * spec can start from the login form without the app being uninstalled first.
  *
  * ## Why this exists at all
  *
@@ -26,7 +26,7 @@
  * It is a **query parameter on `/`** rather than a `/reset` route, and that is the load-bearing part of
  * the spelling. `/reset` would have to exist as a file under `app/` to be reachable — a route that
  * ships in every build, and an unmatched one would render Expo Router's not-found screen over the very
- * picker the reset is trying to reveal. `?reset=1` lands on `/`, where Expo Router's own handling of it
+ * login form the reset is trying to reveal. `?reset=1` lands on `/`, where Expo Router's own handling of it
  * is a no-op, and leaves nothing in the route tree.
  *
  * ## What it does, and what it deliberately does not

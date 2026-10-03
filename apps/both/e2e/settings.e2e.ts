@@ -34,11 +34,20 @@
  * and a screen name — and by text where the text is the assertion.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { LOGIN_FORM, resetToTheLoginForm, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
 
-const CLAIMED_JOBS = 'The jobs you have claimed will appear here.';
+/**
+ * Claimed jobs is a real screen now, so there is no placeholder sentence left to wait on either. A Pro who
+ * holds nothing sees its empty state, and the glyph is what this spec means by "the Pro's claimed list": it
+ * draws, it needs no request to arrive, and no other screen has one. `#12` owns the contents.
+ *
+ * The same edit `#7` and `#10` each had to make here and in `login.e2e.ts` when they replaced a placeholder
+ * with a list. The placeholders are now all gone, so this is the last of them.
+ */
+const CLAIMED_JOBS_EMPTY = 'claimed-jobs-empty-glyph';
 
 /**
  * Posted jobs is a real list now, so there is no placeholder sentence left to wait on. The `+` in its
@@ -55,21 +64,11 @@ const waitForVisible = (testID: string) =>
 const waitForText = (text: string) =>
   waitFor(element(by.text(text))).toBeVisible().withTimeout(VISIBLE_WITHIN);
 
-/**
- * Back to the Role picker without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
- * `login.e2e.ts` has the same two lines. This replaces a `launchApp({ delete: true })`.
- */
-const resetToThePicker = async () => {
-  await device.launchApp({ newInstance: true });
-  await device.openURL({ url: 'repairs:///?reset=1' });
-  await waitForVisible('continue-as-pro');
-};
-
 describe('settings', () => {
   it('shows the person behind the current Role: name, email and the Role itself', async () => {
-    await resetToThePicker();
+    await resetToTheLoginForm(waitForVisible);
 
-    await element(by.id('continue-as-pro')).tap();
+    await signIn('pro');
     await waitForVisible('tab-settings');
     await element(by.id('tab-settings')).tap();
 
@@ -90,7 +89,7 @@ describe('settings', () => {
   it('opens the Pro-only route for a Pro, so the link itself is known to be honoured', async () => {
     await device.openURL({ url: PRO_ONLY_ROUTE });
 
-    await waitForText(CLAIMED_JOBS);
+    await waitForVisible(CLAIMED_JOBS_EMPTY);
   });
 
   it('switches Role, and the tab bar and the list change underneath', async () => {
@@ -121,21 +120,21 @@ describe('settings', () => {
     await device.openURL({ url: PRO_ONLY_ROUTE });
 
     await waitForVisible(POSTED_JOBS_HEADER);
-    await expectElement(element(by.text(CLAIMED_JOBS))).not.toExist();
+    await expectElement(element(by.id(CLAIMED_JOBS_EMPTY))).not.toExist();
     await expectElement(element(by.id('tab-mine'))).not.toExist();
   });
 
-  it('logs out to the Role picker, and the Role does not come back on the next launch', async () => {
+  it('logs out to the login form, and the Role does not come back on the next launch', async () => {
     await element(by.id('tab-settings')).tap();
     await waitForVisible('log-out');
 
     await element(by.id('log-out')).tap();
 
-    await waitForVisible('continue-as-client');
+    await waitForVisible(LOGIN_FORM);
 
     await device.launchApp({ newInstance: true });
 
-    await waitForVisible('continue-as-client');
+    await waitForVisible(LOGIN_FORM);
     await expectElement(element(by.id('tab-bar'))).not.toExist();
   });
 });

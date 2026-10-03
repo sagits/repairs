@@ -2,7 +2,7 @@
  * A route a Role cannot reach is guarded, not deleted, so a deep link to it redirects instead of
  * crashing. The guard is one component used at every such route, and it is tested for the three
  * answers it can give: the right Role passes, the wrong Role is sent home, and nobody signed in is
- * sent home too — the tabs' own gate turns that into the Role picker a frame later.
+ * sent home too — the tabs' own gate turns that into the login form a frame later.
  *
  * `Redirect` is stubbed because a real one outside a navigator has nowhere to go. The stub records
  * where it was sent, which is the one thing about a redirect worth asserting; the name has to start

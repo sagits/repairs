@@ -9,21 +9,21 @@
  * restate it. The only stub is `expo-router`: the route parameter is what selects the Job under test, and
  * a pop outside a navigator has nowhere to go.
  *
- * **The claimed Job is driven here rather than on the device, and that is a gap with a reason.** A claim
- * can only be written by a Pro claiming, and the Pro's claim action does not exist yet — `#11` builds it,
- * *from this screen* among others. So the assigned Pro, and the line that replaces Cancel once a Pro holds
- * the Job, are asserted here through the real store, and `#11`'s spec is where they land on a device.
+ * **Both Pros' actions are driven here, and one of them can only be driven here.** A Job *another* Pro holds is
+ * unreachable on a device: there is exactly one Pro in this app, so a second one's claim record can only be
+ * written by a test. `pro-mine.e2e.ts` asserts the done half of the same branch on a device, and `DECISIONS.md`
+ * records why the other half cannot be.
  *
- * **A failed cancel needs a failing `DELETE` and nothing else.** The fixture server's seeded failure is an
- * id that is poison wherever an id appears, so asking it to fail the delete of a Job also fails the `GET`
- * that loads the screen — there would be no Cancel button to press. `failEveryDelete` therefore wraps
- * `fetch` one layer further out, which is the same seam the fixture server itself occupies, and leaves the
- * load alone.
+ * **A failed write needs one failing method and nothing else.** The fixture server's seeded failure is an id
+ * that is poison wherever an id appears, so asking it to fail the write of a Job also fails the `GET` that
+ * loads the screen — there would be no button to press. `failEvery` therefore wraps `fetch` one layer further
+ * out, which is the same seam the fixture server itself occupies, and leaves the load alone: `DELETE` for the
+ * cancel, `PUT` for the claim and the completion.
  *
  * `render` and `userEvent` are awaited because both are async in React Native Testing Library 14.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { PEOPLE, useLocalJobs, useSession } from '@repairs/stores';
 import { CLIENT_USER_ID, FIXTURE_FAILURE_ID } from '@repairs/testing';
@@ -65,17 +65,23 @@ const signInAs = (role: Role) => useSession.setState({ role, user: PEOPLE[role] 
 const renderScreen = () => render(<JobDetailScreen />, { wrapper });
 
 /**
- * Every `DELETE` answered 500, in the server's own words, with everything else left to the fixtures. The
- * seeded failure id cannot do this job: it poisons the `GET` too, and a screen that never loaded has no
- * button to press.
+ * Every request with the named method answered 500, in the server's own words, with everything else left to
+ * the fixtures. The seeded failure id cannot do this job: it poisons the `GET` too, and a screen that never
+ * loaded has no button to press. `DELETE` is the cancel's failure and `PUT` is the claim's and the
+ * completion's, which is why the method is a parameter rather than three copies of this.
  */
-const failEveryDelete = () => {
+const WHAT_FAILED: Record<string, string> = {
+  DELETE: 'The job could not be cancelled upstream',
+  PUT: 'The job could not be written upstream',
+};
+
+const failEvery = (method: string) => {
   const fixtures = globalThis.fetch;
 
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-    init?.method === 'DELETE'
+    init?.method === method
       ? Promise.resolve(
-          new Response(JSON.stringify({ message: 'The job could not be cancelled upstream' }), {
+          new Response(JSON.stringify({ message: WHAT_FAILED[method] }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },
           }),
@@ -175,7 +181,7 @@ it('offers a Client nothing at all on a Job another Client posted', async () => 
   expect(screen.queryByTestId('cancel-unavailable')).not.toBeOnTheScreen();
 });
 
-/** A Pro has no business cancelling anyone's Job. Their own two actions arrive with `#11` and `#12`. */
+/** A Pro has no business cancelling anyone's Job. They get Claim in its place, which is the test below. */
 it('offers a Pro no Cancel on an open Job', async () => {
   signInAs('pro');
 
@@ -184,6 +190,98 @@ it('offers a Pro no Cancel on an open Job', async () => {
   await waitFor(() => expect(screen.getByText(AN_OPEN_JOB.title)).toBeOnTheScreen());
   expect(screen.queryByTestId('cancel-job')).not.toBeOnTheScreen();
   expect(screen.queryByTestId('cancel-unavailable')).not.toBeOnTheScreen();
+});
+
+/**
+ * The Pro's claim, from the detail screen. **The screen does not pop** — unlike a cancel, which has nothing
+ * left to show, a claim leaves the Job on screen and visibly changed: the pill reads Claimed and the Pro and
+ * the day they took it are on the card. That is requirement 12 for this verb, with no refresh anywhere, and
+ * it is the one place a Pro can read their own claim back immediately.
+ */
+it('claims an open Job from the detail, and the Job reads back as claimed on the same screen', async () => {
+  signInAs('pro');
+  await renderScreen();
+  await waitFor(() => expect(screen.getByTestId('claim-job')).toBeOnTheScreen());
+
+  await userEvent.press(screen.getByTestId('claim-job'));
+
+  await waitFor(() => expect(screen.getByText('Claimed')).toBeOnTheScreen());
+  expect(screen.getByText(new RegExp(`Claimed by ${PEOPLE.pro.name}`))).toBeOnTheScreen();
+  expect(useLocalJobs.getState().claims[AN_OPEN_JOB.id]?.proId).toBe(PEOPLE.pro.id);
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+});
+
+/**
+ * The in-flight state, and the one screen where it is observable at all: the Job stays on screen through its
+ * own claim, so the button can go on spinning until the request settles. The available list cannot show this
+ * — the optimistic write drops the row before a frame could render — and `AvailableJobsScreen.test.tsx`
+ * asserts that absence rather than pretending otherwise.
+ *
+ * **The button is also disabled while it spins, and that is the assertion that matters more than the
+ * spinner.** A second press would reach the store's guard and fail with "That job is no longer open", which
+ * is a confusing thing to say to someone who tapped the same button twice.
+ *
+ * The muted card that goes with it is **not asserted, in either seam**. NativeWind resolves `className` at
+ * native level and leaves neither a `className` nor a `style` prop on the rendered node, so there is nothing
+ * for a query to read; Detox has no matcher for opacity either. `PRD.md` already puts the visual layer on the
+ * by-eye check against `reference/`, and a tint is the visual layer. `DECISIONS.md` records it so the gap
+ * reads as a decision rather than as an oversight.
+ *
+ * `fireEvent` rather than `userEvent`, because the latter awaits the act it wraps and the request would
+ * already have answered by the time it returned.
+ */
+it('spins the Claim and disables it while the request is out', async () => {
+  signInAs('pro');
+  await renderScreen();
+  await waitFor(() => expect(screen.getByTestId('claim-job')).toBeOnTheScreen());
+
+  fireEvent.press(screen.getByTestId('claim-job'));
+
+  await waitFor(() => expect(screen.getByTestId('claim-job-spinner')).toBeOnTheScreen());
+  expect(screen.getByTestId('claim-job')).toBeDisabled();
+
+  await waitFor(() => expect(screen.queryByTestId('claim-job-spinner')).not.toBeOnTheScreen());
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+});
+
+/**
+ * Requirement 10 on the screen: a Job another Pro holds offers **nothing**. Not a disabled button, not a line
+ * of explanation — the Pro reading it has no relationship to this Job, and an empty space is the honest
+ * account of that. The store would refuse the claim anyway; this is the screen agreeing with it.
+ */
+it('offers a Pro nothing at all on a Job another Pro holds', async () => {
+  signInAs('pro');
+  useLocalJobs.setState({
+    created: [],
+    claims: { [AN_OPEN_JOB.id]: { ...aClaim, proId: 'pro-someone-else' } },
+    deleted: [],
+  });
+
+  await renderScreen();
+
+  await waitFor(() => expect(screen.getByText('Claimed')).toBeOnTheScreen());
+  expect(screen.queryByTestId('claim-job')).not.toBeOnTheScreen();
+  expect(screen.queryByTestId('cancel-unavailable')).not.toBeOnTheScreen();
+});
+
+/**
+ * The rollback, on the screen that shows it best: the pill goes back to Open, the Claim comes back, and the
+ * card above says what failed in the server's own words. Only the `PUT` is failed — the seeded failure id
+ * poisons the `GET` that loads the screen, so there would be no button to press.
+ */
+it('rolls the claim back to open with the failure above the card', async () => {
+  signInAs('pro');
+  failEvery('PUT');
+  await renderScreen();
+  await waitFor(() => expect(screen.getByTestId('claim-job')).toBeOnTheScreen());
+
+  await userEvent.press(screen.getByTestId('claim-job'));
+
+  await waitFor(() => expect(screen.getByTestId('claim-job-error')).toBeOnTheScreen());
+  expect(screen.getByText(WHAT_FAILED.PUT as string)).toBeOnTheScreen();
+  expect(screen.getByText('Open')).toBeOnTheScreen();
+  expect(screen.getByTestId('claim-job')).toBeOnTheScreen();
+  expect(useLocalJobs.getState().claims).toEqual({});
 });
 
 /**
@@ -230,7 +328,7 @@ it('cancels on confirmation, records it in the store, and pops back to the list'
  * so that this line can be the server's rather than "Something went wrong".
  */
 it('puts the Job back and says what failed when the cancel does not reach the server', async () => {
-  failEveryDelete();
+  failEvery('DELETE');
   await renderScreen();
   await waitFor(() => expect(screen.getByTestId('cancel-job')).toBeOnTheScreen());
 
@@ -282,4 +380,83 @@ it("shows the error card in the server's own words when the Job fails to load, w
   ).toBeOnTheScreen();
   expect(screen.getByTestId('retry-job')).toBeOnTheScreen();
   expect(screen.queryByTestId('job-not-found')).not.toBeOnTheScreen();
+});
+
+/**
+ * Mark as done, from the detail. A Pro who holds the Job gets it; the Client who posted it never does, which
+ * the test below the next one covers from the other side.
+ */
+it('marks a Job the Pro holds as done, and the Job reads back as done on the same screen', async () => {
+  signInAs('pro');
+  useLocalJobs.setState({ created: [], claims: { [AN_OPEN_JOB.id]: aClaim }, deleted: [] });
+  await renderScreen();
+  await waitFor(() => expect(screen.getByTestId('complete-job')).toBeOnTheScreen());
+
+  await userEvent.press(screen.getByTestId('complete-job'));
+
+  // The pill turns on the optimistic write and the button goes once the request has settled — `|| completing`
+  // holds it there, disabled and spinning, in between. So the second of these is a `waitFor` and not a
+  // straight assertion, and the order of the two is the pending state existing at all.
+  await waitFor(() => expect(screen.getByText('Done')).toBeOnTheScreen());
+  await waitFor(() => expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen());
+  // The hold is ended, not erased — the record still names the Pro and the day they took it.
+  expect(useLocalJobs.getState().claims[AN_OPEN_JOB.id]).toMatchObject({
+    proId: PEOPLE.pro.id,
+    claimedAt: aClaim.claimedAt,
+  });
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+});
+
+/**
+ * The other half of requirement 10 on this screen: a Job **another** Pro holds offers nothing, and a Job
+ * already done offers nothing either. Both are asserted here rather than on the device, and for one of them
+ * there is no choice — there is exactly one Pro in this app, so a second Pro's claim can only be written by a
+ * test. `pro-mine.e2e.ts` asserts the done half on a device, which is the same branch.
+ */
+it("offers a Pro nothing on a Job another Pro holds, and nothing on one already done", async () => {
+  signInAs('pro');
+  useLocalJobs.setState({
+    created: [],
+    claims: { [AN_OPEN_JOB.id]: { ...aClaim, proId: 'pro-someone-else' } },
+    deleted: [],
+  });
+
+  await renderScreen();
+
+  await waitFor(() => expect(screen.getByText('Claimed')).toBeOnTheScreen());
+  expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen();
+  expect(screen.queryByTestId('claim-job')).not.toBeOnTheScreen();
+
+  openJob(A_DONE_JOB.id);
+  await renderScreen();
+
+  await waitFor(() => expect(screen.getByText('Done')).toBeOnTheScreen());
+  expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen();
+  expect(screen.queryByTestId('claim-job')).not.toBeOnTheScreen();
+});
+
+/** And a Client never has it, whoever holds the Job — the Client's verb is Cancel and only while it is open. */
+it('offers a Client no Mark as done on a Job a Pro holds', async () => {
+  useLocalJobs.setState({ created: [], claims: { [AN_OPEN_JOB.id]: aClaim }, deleted: [] });
+
+  await renderScreen();
+
+  await waitFor(() => expect(screen.getByText('Claimed')).toBeOnTheScreen());
+  expect(screen.queryByTestId('complete-job')).not.toBeOnTheScreen();
+});
+
+/** The rollback goes back to claimed, not to open: the Job is still held, it is just not finished. */
+it('rolls a failed completion back to claimed with the failure above the card', async () => {
+  signInAs('pro');
+  useLocalJobs.setState({ created: [], claims: { [AN_OPEN_JOB.id]: aClaim }, deleted: [] });
+  failEvery('PUT');
+  await renderScreen();
+  await waitFor(() => expect(screen.getByTestId('complete-job')).toBeOnTheScreen());
+
+  await userEvent.press(screen.getByTestId('complete-job'));
+
+  await waitFor(() => expect(screen.getByTestId('complete-job-error')).toBeOnTheScreen());
+  expect(screen.getByText('Claimed')).toBeOnTheScreen();
+  expect(screen.getByTestId('complete-job')).toBeOnTheScreen();
+  expect(useLocalJobs.getState().claims[AN_OPEN_JOB.id]?.completedAt).toBeUndefined();
 });

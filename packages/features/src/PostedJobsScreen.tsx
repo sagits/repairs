@@ -3,13 +3,13 @@
  * Client has only one list and that is what they call it; `GLOSSARY.md` is why every other name in here
  * says posted jobs instead.
  */
-import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useClientJobs } from '@repairs/api';
-import { colors, HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import { colors, ErrorCard, GlyphFrame, HeaderBand, Screen, StatusPill } from '@repairs/ui';
 import type { Job } from '@repairs/types';
 import { asDay, proName } from './jobText';
+import { JobListSkeleton, useSkeletonHold } from './listSkeleton';
 
 /**
  * One row, and the way into the Job. Three of its four lines are conditional, and every one of them is
@@ -47,79 +47,19 @@ function PostedJobRow({ job, onOpen }: { job: Job; onOpen: () => void }) {
 }
 
 /**
- * The minimum a skeleton stays up, and the smaller half of the pair `ADR 0001` engineered: the fixture
- * server answers in a flat 600ms, so there is 300ms of daylight on either side of this and the Detox
- * assertion "skeleton visible, then wait for the content" is a fact rather than a coin flip. **Neither
- * number is to be shortened to make a test easier.** It also does the job it is nominally for — a
- * response that beats the eye leaves a skeleton behind for long enough to read as loading rather than
- * as a glitch.
- */
-const SKELETON_HOLD_MS = 300;
-
-/**
- * `true` while the skeleton should be up: for as long as the query is pending, and for the first
- * `SKELETON_HOLD_MS` of the screen's life whether it is pending or not.
- *
- * The hold is anchored to **mount** rather than to the moment the query went pending, which for a first
- * load is the same moment and for everything after is deliberately not: a pull to refresh must leave the
- * list on screen, so re-arming the hold on every pending would put three grey rows over a list the Client
- * is already reading. The timer is also the only thing that writes state — nothing is set synchronously
- * inside the effect, which is what the React compiler's rule about cascading renders is for.
- */
-function useSkeletonHold(pending: boolean) {
-  const [holding, setHolding] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setHolding(false), SKELETON_HOLD_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return pending || holding;
-}
-
-/**
- * One skeleton row, and three of them is what a first load looks like. Every block carries the
- * `skeleton` token as a background rather than a border, because Detox's `toBeVisible` does not hold for
- * a view that draws nothing — `DECISIONS.md` has the spec that lost a minute of its life to that — and
- * the spec that waits on these has to be able to see them.
- */
-function PostedJobsSkeleton() {
-  return (
-    <View className="gap-3 px-5 py-6">
-      {[0, 1, 2].map((row) => (
-        <View
-          key={row}
-          testID={`posted-jobs-skeleton-${row}`}
-          className="rounded-card bg-surface px-4 py-4 shadow-card"
-        >
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="h-5 flex-1 rounded bg-skeleton" />
-            <View className="h-6 w-16 rounded-card bg-skeleton" />
-          </View>
-          <View className="mt-3 h-4 w-24 rounded bg-skeleton" />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/**
- * Nothing posted yet, which is the screen that has to explain the app rather than report a count. The
- * illustration is drawn from views because there is no icon font installed — `@expo/vector-icons` is not
- * a dependency, which `DECISIONS.md` records — and three flat `illustration`-grey bars inside a rounded
- * outline read as a list with nothing on it, which is exactly what it is.
+ * Nothing posted yet, which is the screen that has to explain the app rather than report a count. Three
+ * flat `illustration`-grey bars inside a `GlyphFrame` read as a list with nothing on it, which is exactly
+ * what it is — and `GlyphFrame` is where the reason this is drawn by hand rather than set in an icon font
+ * is written down.
  */
 function EmptyPostedJobs({ onPostJob }: { onPostJob: () => void }) {
   return (
     <View className="items-center px-5 py-16">
-      <View
-        testID="posted-jobs-empty-glyph"
-        className="h-20 w-20 items-center justify-center gap-1.5 rounded-card border-2 border-illustration"
-      >
+      <GlyphFrame testID="posted-jobs-empty-glyph">
         <View className="h-1.5 w-9 rounded bg-illustration" />
         <View className="h-1.5 w-9 rounded bg-illustration" />
         <View className="h-1.5 w-5 rounded bg-illustration" />
-      </View>
+      </GlyphFrame>
       <Text className="mt-5 text-lg font-semibold text-ink">No jobs posted yet</Text>
       <Text className="mt-1 text-center text-base leading-6 text-slate">
         Post a repair job and a Pro can claim it.
@@ -132,33 +72,6 @@ function EmptyPostedJobs({ onPostJob }: { onPostJob: () => void }) {
         onPress={onPostJob}
       >
         <Text className="text-base font-semibold text-surface">Post a job</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-/**
- * What failed, and the one thing to do about it. **Inline, and never a blank screen** — it renders above
- * the list rather than in place of it, so a refetch that fails leaves the Jobs that did arrive exactly
- * where they were and adds an explanation on top.
- *
- * The message is the server's own words. `client.ts` goes out of its way to parse a non-2xx body for its
- * `message` so that a screen can show it, and replacing that with "Something went wrong" here would
- * throw away the only part of the failure anyone can act on.
- */
-function PostedJobsError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <View className="rounded-card border border-danger bg-surface px-4 py-4">
-      <Text className="text-base font-semibold text-danger">Could not load your jobs</Text>
-      <Text className="mt-1 text-sm leading-5 text-slate">{message}</Text>
-      <Pressable
-        testID="retry-posted-jobs"
-        accessibilityRole="button"
-        accessibilityLabel="Retry"
-        className="mt-3 self-start rounded-card bg-primary px-5 py-3"
-        onPress={onRetry}
-      >
-        <Text className="text-base font-semibold text-surface">Retry</Text>
       </Pressable>
     </View>
   );
@@ -196,14 +109,19 @@ export function PostedJobsScreen() {
    * failed to arrive.
    */
   const errorCard = error ? (
-    <PostedJobsError message={error.message} onRetry={() => void refetch()} />
+    <ErrorCard
+      testID="posted-jobs-error"
+      title="Could not load your jobs"
+      message={error.message}
+      retry={{ testID: 'retry-posted-jobs', onPress: () => void refetch() }}
+    />
   ) : null;
 
   return (
     <Screen>
       <HeaderBand title="My Jobs" action={<PostJobButton onPress={postJob} />} />
       {showSkeleton ? (
-        <PostedJobsSkeleton />
+        <JobListSkeleton testIDPrefix="posted-jobs" />
       ) : (
         <FlatList
           testID="posted-jobs"

@@ -4,7 +4,7 @@
  * under a mounted screen all arrive at it regardless, and the alternative to a redirect is a crash.
  *
  * Home is `/` for every Role, which is why one component covers every such route: `/` is the tab both
- * Roles have, and the tabs' own gate turns a `/` with nobody signed in into the Role picker.
+ * Roles have, and the tabs' own gate turns a `/` with nobody signed in into the login form.
  */
 import { Redirect } from 'expo-router';
 import type { ReactNode } from 'react';

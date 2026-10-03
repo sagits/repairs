@@ -35,6 +35,7 @@
  * this screen's name — and by text where the text is the assertion.
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
+import { LOGIN_FORM, signIn } from './sign-in';
 
 /** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
 const VISIBLE_WITHIN = 30_000;
@@ -70,7 +71,7 @@ const statusOf = (jobId: number, status: string) =>
 describe('client jobs', () => {
   it('holds a skeleton in front of the first load, then shows the posted Jobs', async () => {
     await device.launchApp({ newInstance: true, delete: true });
-    await waitForVisible('continue-as-client');
+    await waitForVisible(LOGIN_FORM);
 
     /**
      * Synchronisation off for exactly this one tap, and the reason is the whole subtlety of asserting a
@@ -83,7 +84,7 @@ describe('client jobs', () => {
      */
     await device.disableSynchronization();
     try {
-      await element(by.id('continue-as-client')).tap();
+      await signIn('client');
 
       await waitForVisible('posted-jobs-skeleton-0');
       await waitForText(AN_OPEN_JOB.title);
