@@ -593,3 +593,94 @@ assertion under Node and a Detox assertion under Hermes can disagree about on th
 abbreviates September as "Sept" where Node gives "Sep". `createdAt` is written by this app in UTC, so
 reading UTC back is not a simplification of the truth; it is the truth. If the app is ever localised, the
 table is what gets replaced.
+
+## The Detox harness reuses Metro and the installed app, and stamps the install so `--reuse` cannot lie
+
+Not a `PRD.md` ticket and not a GitHub issue — asked for directly part way through the spec, with seven
+Detox tickets left to go and each one running the suite many times. This entry is the only record it
+gets, which is why it carries the measurements.
+
+**Metro is reused when one is already serving on `:8081`,** and only a Metro `scripts/e2e-test.sh`
+started itself gets the kill `trap`. So `pnpm --filter @repairs/both e2e:metro` can be left running for a
+whole ticket and every run after the first skips the cold bundle. `detox test --reuse` comes with it, so
+the app is not uninstalled and reinstalled per run. **Measured on the full 14-test suite: 114s cold,
+83s against a warm Metro.**
+
+**The stamp is the part that keeps `--reuse` honest.** Reuse is safe for JS, which Metro serves, and
+unsafe for native code, which is compiled into the binary — and a stale install presents as a missing JS
+export, which is the confusing failure the note at the top of `.detoxrc.js` exists for. Leaving that
+distinction to whoever remembers it was not acceptable for a flag that is now on by default, so the
+script `touch`es `ios/build/.detox-installed` after a successful install and drops `--reuse` whenever the
+built binary is newer than the stamp. `E2E_FRESH=1` forces one by hand. The stamp is only written when
+Detox **passed**, so a failed run reinstalls next time rather than trusting an install that may not have
+finished. Verified by running `pnpm e2e:build` and confirming the next run reinstalled.
+
+**Reuse and `EXPO_PUBLIC_API` do not mix, so the script refuses rather than guesses.** `EXPO_PUBLIC_*` is
+inlined at bundle time, so a Metro already serving is serving the value it was *started* with. A run
+asking for a different one would get the wrong bundle and still report success — and the concrete
+casualty would have been **#15 — "One Detox pass against the real API"**, whose entire point is
+`EXPO_PUBLIC_API=live`, passing green against the fixtures. A non-default value therefore refuses to run
+while a Metro is up instead of quietly starting a second one that cannot have the port. `e2e:metro`
+carries the same `fixtures` default for the other half of that bargain: a bare `expo start` would serve a
+bundle pointed at the real DummyJSON and be reused here without complaint.
+
+**`reuse` is a scalar, not an array,** because `/bin/bash` on this machine is 3.2, where expanding an
+empty array under `set -u` is an unbound-variable error. The drafted version used an array and would have
+aborted on precisely the fresh-install path it exists for. That is the kind of thing `bash -n` does not
+catch.
+
+## `repairs:///?reset=1` replaces `delete: true` for a signed-out opening — and it did not make the suite faster
+
+The reasoning was that `launchApp({ newInstance: true, delete: true })` uninstalls and reinstalls the app
+*per test* regardless of `--reuse`, that three of the suite's six launches used it, and that every list
+ticket still ahead wants the same "start signed out" opening. So `apps/both/dev-reset.ts` registers a
+`__DEV__`-only URL listener that empties both persisted stores and lets the app redirect itself to the
+Role picker — the same path the Log out button takes, and the same deep-link channel `fixtures.ts`
+already rides on, which is the one channel this stack reliably delivers.
+
+**The premise turned out to be wrong, and the measurement is the useful part of this entry.** On a
+permanently booted simulator with a Debug binary this small, `delete: true` under `--reuse` costs about
+**0.6s**, not the double-digit seconds it was assumed to. Reset-by-link costs a relaunch *plus* an
+`openURL` round trip, so the three converted tests each got ~0.5–1.5s **slower** and the suite went from
+83s to 87s. The reset link is kept anyway, on two grounds that are not speed: it says what it means
+(clear the stores) rather than achieving it by side effect, and it does not depend on how a given Detox
+version happens to treat `delete` under `--reuse`. **Nobody should convert another launch expecting it to
+be faster.**
+
+**The spelling is a query parameter on `/`, not a `/reset` route.** A route would have to exist as a file
+under `app/` to be reachable, which means it ships in every build, and an unmatched one would render Expo
+Router's not-found screen over the very picker the reset is trying to reveal. `?reset=1` lands on `/`,
+where Expo Router's handling of it is a no-op, and leaves nothing in the route tree. The `__DEV__` guard
+is a build-time constant, so the branch is eliminated from a release bundle rather than merely skipped,
+and it must stay that way — a link that silently wipes someone's data is not a thing to ship.
+
+**Three launches stayed real, and that is the load-bearing half.** `login.e2e.ts`'s "is still that Client
+after a restart" and `settings.e2e.ts`'s "the Role does not come back on the next launch" assert
+*rehydration from disk*; resetting those by link would leave them green while testing nothing.
+`client-jobs.e2e.ts` still opens on `delete: true` for a different reason: the reset has no handle on the
+react-query cache, which lives inside `AppProviders`, so a relaunch carrying a warm cache would answer
+the Client's list from memory and leave only the 300ms mount hold where `ADR 0001` sized the skeleton
+assertion against 600ms of pending request. Cold storage is not the same thing as a cold cache.
+
+This was **verified by assertion in the opposite direction**, which is the technique that caught the
+deep-link hole in `#6`: the listener was temporarily made a no-op, and the converted tests failed on the
+Role picker never appearing. Without that check all three would have been green against a reset that did
+nothing.
+
+## The Detox timeouts come back down, because they are sized for debugging and not for passing
+
+`setupTimeout` 180s → **60s** (`.detoxrc.js`), `testTimeout` 120s → **60s** (`e2e/jest.config.js`), and
+the specs' own `VISIBLE_WITHIN` 60s → **30s**. All three were sized for Metro's cold bundle, which the
+entry above takes off the common path.
+
+They cost nothing on a passing run and everything on a failing one, which is the case that happens over
+and over while a spec is being written. Measured against the numbers they have to clear: the slowest test
+in the suite is ~14s (the error state, which waits out `createQueryClient`'s `retry: 2` against the
+fixtures' 600ms delay — roughly 4.8s before a failure even surfaces), device allocation against the
+booted device is a couple of seconds, and a first launch on a cold Metro is ~13s end to end. Proved
+against a cold run, not only a warm one.
+
+`testTimeout` is deliberately left **above** `VISIBLE_WITHIN`, so a matcher that never finds its element
+reports as Detox's "element not visible" rather than as a bare Jest timeout that says nothing about what
+was on screen. Raise them together or not at all. The one case that will fail first is a genuinely cold
+Metro cache, which only happens when someone clears it — `VISIBLE_WITHIN` is the number to raise then.
