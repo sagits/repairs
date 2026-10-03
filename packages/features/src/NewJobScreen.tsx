@@ -20,10 +20,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text } from 'react-native';
 import { useCreateJob } from '@repairs/api';
 import { useNewJobDraft } from '@repairs/stores';
-import { colors, FormField, HeaderBand, Screen } from '@repairs/ui';
+import { colors, ErrorCard, FormField, HeaderBand, Screen } from '@repairs/ui';
 import { NewJobSchema, type NewJobInput } from '@repairs/types';
 import { RoleGuard } from './RoleGuard';
 
@@ -42,21 +42,6 @@ function CloseButton({ onPress }: { onPress: () => void }) {
     >
       <Text className="text-base font-semibold text-primaryInk">Cancel</Text>
     </Pressable>
-  );
-}
-
-/**
- * A failed request, said as its own problem. It is a card **above** the form rather than a line under a
- * field, because "the network is down" is nothing to do with what was typed, and the two reading alike
- * would make a person edit a title that was never the problem. The words are the server's own — `client.ts`
- * parses a non-2xx body for its `message` precisely so a screen can print it.
- */
-function PostJobError({ message }: { message: string }) {
-  return (
-    <View testID="new-job-error" className="rounded-card border border-danger bg-surface px-4 py-4">
-      <Text className="text-base font-semibold text-danger">Could not post your job</Text>
-      <Text className="mt-1 text-sm leading-5 text-slate">{message}</Text>
-    </View>
   );
 }
 
@@ -118,7 +103,19 @@ function NewJobForm() {
     <Screen>
       <HeaderBand title="Post a job" action={<CloseButton onPress={() => router.back()} />} />
       <ScrollView contentContainerClassName="gap-5 px-5 py-6" keyboardShouldPersistTaps="handled">
-        {createJob.error ? <PostJobError message={createJob.error.message} /> : null}
+        {/*
+          * A failed request, said as its own problem. It is a card **above** the form rather than a line
+          * under a field, because "the network is down" is nothing to do with what was typed, and the two
+          * reading alike would make a person edit a title that was never the problem. No Retry on it: the
+          * form's own submit button is the retry, and a second one would be two ways to do one thing.
+          */}
+        {createJob.error ? (
+          <ErrorCard
+            testID="new-job-error"
+            title="Could not post your job"
+            message={createJob.error.message}
+          />
+        ) : null}
         <FormField
           control={control}
           name="title"

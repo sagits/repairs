@@ -6,10 +6,10 @@
  * way to parse a non-2xx body for its `message` precisely so a screen can show it, and throwing that away
  * would discard the only part of a failure anyone can act on.
  *
- * **This was four near-identical copies**, one per screen: three load errors with a Retry, and
- * `JobActions`' `ActionError` which was the same card without one. `DECISIONS.md`'s test for a shared
- * component is whether it is smaller than its interface, and three props plus an optional pair clears it at
- * six call sites. The Retry is one optional object rather than two optional props because neither half of it
+ * **This was five near-identical copies**, one per screen: three load errors with a Retry, `JobActions`'
+ * `ActionError` which was the same card without one, and the new-job form's. `DECISIONS.md`'s test for a
+ * shared component is whether it is smaller than its interface, and three props plus an optional pair clears
+ * it at seven call sites. The Retry is one optional object rather than two optional props because neither half of it
  * is any use without the other: a handler with no `testID` cannot be pressed by a spec, and a `testID` with
  * no handler does nothing.
  *

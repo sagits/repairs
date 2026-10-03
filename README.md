@@ -163,7 +163,7 @@ Metro first.
 
 ## Where it stands
 
-Both suites are green at this commit: **208 Jest tests in 20 suites**, and **38 passed with 3 skipped**
+Both suites are green at this commit: **213 Jest tests in 20 suites**, and **41 passed with 3 skipped**
 across the eight Detox specs — seven suites run, and the eighth skips itself whole. That eighth is
 `live.e2e.ts`, which reads `EXPO_PUBLIC_API` in the runner's own process and is a `describe.skip`
 unless it is `live`: a spec coupled to the live dataset would otherwise be picked up by a bare

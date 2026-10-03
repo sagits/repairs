@@ -13,9 +13,9 @@
  * mutation in flight disables its own button and shows a spinner inside it.
  *
  * The other half of that rule — that a failure is reported in the server's own words next to the thing that
- * failed — used to live here as `ActionError`. It is `ErrorCard` in `@repairs/ui` now, because the three
- * load-failure cards on the lists and the detail screen were the same card with a Retry on it, and a card
- * reporting "Could not load your jobs" has no business being imported from a file named for actions.
+ * failed — used to live here as `ActionError`. It is `ErrorCard` in `@repairs/ui` now, because four other
+ * screens had written the same card out by hand, and one reporting "Could not load your jobs" has no business
+ * being imported from a file named for actions.
  */
 import { ActivityIndicator, Pressable, Text } from 'react-native';
 import { colors } from '@repairs/ui';

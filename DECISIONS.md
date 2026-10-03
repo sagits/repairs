@@ -1309,9 +1309,11 @@ what keeps the suite from claiming it already works.
 shared thing has to be smaller than its interface, and two callers earn a file where one did not.
 
 **Taken.** The two failure titles two screens each have to word identically (`jobText.ts`, which already
-exists for exactly this). The error card, four near-copies — three load errors with a Retry, plus
-`JobActions`' `ActionError` which was that card without one — now `ErrorCard` in `@repairs/ui` at three props
-and an optional `retry`, six call sites. The glyph frame, four copies of one `className` with the "there is no
+exists for exactly this). The error card, which turned out to be **five** near-copies rather than the four the
+review found — three load errors with a Retry, `JobActions`' `ActionError` which was that card without one,
+and `NewJobScreen`'s `PostJobError`, which nobody had noticed because it is the one error card on a screen
+with no list on it. All of them are `ErrorCard` in `@repairs/ui` now: three props and an optional `retry`,
+seven call sites. The glyph frame, four copies of one `className` with the "there is no
 icon font in this build" paragraph pasted above three of them — now `GlyphFrame`, two props, and the paragraph
 once. `ROLE_LABELS`, which was a `Record<Role, string>` in Settings and an array of `{ role, label }` in the
 login form: the same two words, twice, in two shapes, now beside the `Role` type with `ROLES` derived from it.
