@@ -9,7 +9,7 @@
  * `packages/*`, so the injected import cannot resolve from here. `DECISIONS.md` has the long version.
  */
 import type { z } from 'zod';
-import { ApiErrorSchema, TodoListSchema, type TodoList } from './schemas';
+import { ApiErrorSchema, TodoListSchema, type Todo, type TodoList } from './schemas';
 
 export const API_BASE_URL = 'https://dummyjson.com';
 
@@ -68,6 +68,27 @@ async function getJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 
   return parsed.data;
 }
+
+/**
+ * A create, and the only write this app makes. **It returns nothing on purpose.**
+ *
+ * `POST /todos/add` answers a record-shaped body whose id is always `255` and forgets the row, so the
+ * response carries no information at all: the `local-N` id the store minted is the id that survives, and
+ * `ADR 0002` is why the Job lives locally rather than being fetched back. There is therefore nothing to
+ * parse a response schema against — the thing a schema would protect does not get read.
+ *
+ * The request still goes out, and that is not ceremony: its pending state and its failure are states the
+ * new-job form has to render, and neither is real unless there is a real request behind it.
+ */
+export const createTodo = async (body: Omit<Todo, 'id'>): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/todos/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) throw await errorFrom(response);
+};
 
 /**
  * One page of every Job, for the Pro's available list. The envelope is returned whole rather than

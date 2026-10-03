@@ -13,10 +13,12 @@
     "@repairs/ui": "workspace:*"
   },
   "peerDependencies": {
+    "@hookform/resolvers": "*",
     "@tanstack/react-query": "*",
     "expo-router": "*",
     "nativewind": "*",
     "react": "*",
+    "react-hook-form": "*",
     "react-native": "*"
   },
   "devDependencies": {
