@@ -25,7 +25,9 @@
  * delivers when someone taps a link, and it works. `DECISIONS.md` has the long version.
  *
  * The specs share a device and run in file order, so each one starts where the one above it finished.
- * Only the first launch deletes the app; the rest are deliberate continuations.
+ * Only the first launch resets anything; the rest are deliberate continuations. The **last** test is the
+ * exception that matters: it launches for real, because reading the absent Role back off disk is the
+ * thing it asserts, and a reset by link would leave it green while testing nothing.
  *
  * Detox's `expect` is imported under another name because Jest's global `expect` is also in scope.
  * Elements are matched by `testID` where a label would be ambiguous — "My Jobs" is both a tab label
@@ -33,8 +35,8 @@
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
 
-/** Generous for the same reason `login.e2e.ts` is: the first launch of a run waits on Metro. */
-const VISIBLE_WITHIN = 60_000;
+/** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
+const VISIBLE_WITHIN = 30_000;
 
 const CLAIMED_JOBS = 'The jobs you have claimed will appear here.';
 
@@ -53,10 +55,19 @@ const waitForVisible = (testID: string) =>
 const waitForText = (text: string) =>
   waitFor(element(by.text(text))).toBeVisible().withTimeout(VISIBLE_WITHIN);
 
+/**
+ * Back to the Role picker without uninstalling the app — `apps/both/dev-reset.ts` is the mechanism, and
+ * `login.e2e.ts` has the same two lines. This replaces a `launchApp({ delete: true })`.
+ */
+const resetToThePicker = async () => {
+  await device.launchApp({ newInstance: true });
+  await device.openURL({ url: 'repairs:///?reset=1' });
+  await waitForVisible('continue-as-pro');
+};
+
 describe('settings', () => {
   it('shows the person behind the current Role: name, email and the Role itself', async () => {
-    await device.launchApp({ newInstance: true, delete: true });
-    await waitForVisible('continue-as-pro');
+    await resetToThePicker();
 
     await element(by.id('continue-as-pro')).tap();
     await waitForVisible('tab-settings');

@@ -19,8 +19,15 @@
  * That is the only trigger the screen has that does not depend on a `staleTime` elapsing, and it earns the
  * gesture's own acceptance criterion on the way past.
  *
- * The specs share a device and run in file order, so each starts where the one above it finished. Only
- * the first launch deletes the app.
+ * The specs share a device and run in file order, so each starts where the one above it finished.
+ *
+ * **This is the one spec that still opens on `delete: true`, and the skeleton is why.** Everywhere else
+ * a signed-out opening now comes from `repairs:///?reset=1`, which empties the two persisted stores
+ * without the uninstall-and-reinstall `delete: true` costs — see `apps/both/dev-reset.ts`. That reset
+ * cannot help here: it has no handle on the react-query cache, which lives inside `AppProviders`. A
+ * relaunch carrying a warm cache would answer the Client's list from memory, leaving only the 300ms
+ * mount hold where `ADR 0001` sized the assertion against 600ms of pending request. Deleting the app is
+ * what guarantees a cold cache as well as cold storage, so the first load really is a first load.
  *
  * Detox's `expect` is imported under another name because Jest's global `expect` is also in scope.
  * Elements are matched by `testID` where a label would be ambiguous — "My Jobs" is both a tab label and
@@ -28,8 +35,8 @@
  */
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
 
-/** Generous for the same reason the other specs are: the first launch of a run waits on Metro. */
-const VISIBLE_WITHIN = 60_000;
+/** Sized for the same reason, and against the same measurements, as `login.e2e.ts`'s. */
+const VISIBLE_WITHIN = 30_000;
 
 /**
  * Two of the Client's six Jobs, by the titles the fixtures derive from their ids, and the ids themselves

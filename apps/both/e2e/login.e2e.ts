@@ -3,9 +3,13 @@
  * Role is read back off storage before anything renders, so the picker is not merely replaced on the
  * way through — it never appears at all.
  *
- * The two sign-ins start from `delete: true`, which reinstalls and so wipes storage. Settings has a log
- * out now, and `settings.e2e.ts` drives it — but a reinstall is still what makes each sign-in here a
- * genuinely cold one rather than a continuation of the test above it, which is the point.
+ * The two sign-ins start from a relaunch plus a `repairs:///?reset=1` link, which empties both persisted
+ * stores and leaves the app on the picker. That is what makes each sign-in here a genuinely cold one
+ * rather than a continuation of the test above it, which is the point. It used to be `delete: true`,
+ * which got there by reinstalling the app — correct, and the most expensive line in the suite.
+ *
+ * The relaunch is not decoration: a fresh process is what guarantees the Role is read back off an empty
+ * store rather than merely absent from memory. The reset only empties what is on disk.
  *
  * Detox's `expect` is imported under a different name because Jest's global `expect` is also in scope
  * here and the two are not interchangeable. The tabs are matched by `testID` rather than by their
@@ -23,20 +27,38 @@
 import { by, device, element, expect as expectElement, waitFor } from 'detox';
 
 /**
- * Generous, because the first launch of the run is a fresh install whose bundle Metro has not built
- * yet, and that alone can take half a minute. `waitFor` returns as soon as the element is there, so
- * the warm launches below pay nothing for the headroom.
+ * Sized for the slowest wait in the suite with room to spare, and no more than that. `waitFor` returns
+ * as soon as the element is there, so a passing run pays nothing for the headroom — but a *failing*
+ * matcher pays all of it, every time round the red-green loop, which is where the time in a ticket
+ * actually goes. The first launch of a run on a cold Metro has been measured at ~13s end to end; the
+ * rest are a second or two. 30s is twice the worst of those.
+ *
+ * It was 60s when every run started Metro from cold. `scripts/e2e-test.sh` reuses a warm one now, so
+ * that premise is gone. If a run ever does pay a genuinely cold bundle — someone cleared Metro's cache
+ * — this is the number that will fail first, and raising it is the fix. `e2e/jest.config.js`'s
+ * `testTimeout` must stay above whatever this is.
  */
-const VISIBLE_WITHIN = 60_000;
+const VISIBLE_WITHIN = 30_000;
 
 const waitForVisible = (testID: string) =>
   waitFor(element(by.id(testID))).toBeVisible().withTimeout(VISIBLE_WITHIN);
 
+/**
+ * Back to "nobody has ever used this", without uninstalling the app. `apps/both/dev-reset.ts` is the
+ * mechanism; `launchApp({ delete: true })` is what this replaces, and it reinstalled the app per test.
+ */
+const RESET = 'repairs:///?reset=1';
+
+const resetToThePicker = async () => {
+  await device.launchApp({ newInstance: true });
+  await device.openURL({ url: RESET });
+  await waitForVisible('continue-as-client');
+};
+
 describe('login', () => {
   it('opens on the Role picker, offering both Roles', async () => {
-    await device.launchApp({ newInstance: true, delete: true });
+    await resetToThePicker();
 
-    await waitForVisible('continue-as-client');
     await expectElement(element(by.id('continue-as-client'))).toHaveLabel('Continue as Client');
     await expectElement(element(by.id('continue-as-pro'))).toHaveLabel('Continue as Pro');
   });
@@ -60,8 +82,7 @@ describe('login', () => {
   });
 
   it('signs a Pro in to their three tabs, and the tabs navigate', async () => {
-    await device.launchApp({ newInstance: true, delete: true });
-    await waitForVisible('continue-as-pro');
+    await resetToThePicker();
 
     await element(by.id('continue-as-pro')).tap();
 
