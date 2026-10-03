@@ -1,0 +1,21 @@
+{
+  "name": "@repairs/api",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@repairs/stores": "workspace:*",
+    "@repairs/types": "workspace:*"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "*",
+    "react": "*",
+    "zod": "*"
+  },
+  "devDependencies": {
+    "@repairs/testing": "workspace:*"
+  }
+}
