@@ -236,19 +236,8 @@ written down where it bit — in `DECISIONS.md`, or in the comment at the top of
   `GET /todos` cannot filter by status, which is why the available list filters after a page arrives
   and a page of twenty can render fewer than twenty rows. A documented trade-off, not a defect.
 
-**Deferred, not done:**
-
-- **The two role-locked apps were not built.** `docs/adr/0003` plans Repairs Client and Repairs Pro as
-  thin shells with a parity script diffing the three route trees; `apps/client`, `apps/pro` and
-  `scripts/check-app-parity.mjs` do not exist. The ADR explicitly rejects a README paragraph claiming
-  the code would support splitting, so this is the only thing said about it: it is issue **#13**, it is
-  open, and nothing of it was built.
-- **The web target was not built.** `react-native-web`, `react-dom` and a `build:web` script are
-  installed and wired; none of it has ever been run, and nothing has been deployed. Issue **#14**. One
-  piece of that ticket was never web-only: the tab bar was to become a left sidebar at `md:` in
-  responsive classes, so a wide tablet got it on native too. `RoleTabBar` is a bottom bar on every
-  device, which is a product gap and not only a missing platform.
-- **The write path has never met the real API.** Reads have; `PUT /todos/{id}` has not.
+**Deferred, not done:** the two role-locked apps and the web target, both of them in `## TO-DO`
+below. And the write path has never met the real API — reads have, `PUT /todos/{id}` has not.
 
 **Where the tests stop:**
 
@@ -278,6 +267,20 @@ deviation; the deviation was chosen, so the trailer is on every commit from that
 stopping half way, which would read like an abandoned cleanup. The author is Renato Probst on all of
 them and there is no "Generated with" line anywhere. `DECISIONS.md` has the entry.
 
+## TO-DO
+
+Two tickets were deliberately not done. Both are open, and each carries a comment on the issue
+explaining why it was left.
+
+- **[#14 — The web target](https://github.com/sagits/repairs/issues/14).** `react-native-web`,
+  `react-dom` and a `build:web` script are installed and wired; the script has never been run and
+  nothing has been deployed. One piece of that ticket was never web-only: the tab bar was to become a
+  left sidebar at `md:` in responsive classes, so a wide tablet got it on native too. `RoleTabBar` is a
+  bottom bar on every device, which is a product gap and not only a missing platform.
+- **[#13 — Repairs Client and Repairs Pro, with parity enforced](https://github.com/sagits/repairs/issues/13).**
+  `apps/client`, `apps/pro` and `scripts/check-app-parity.mjs` do not exist. `docs/adr/0003` has the
+  reasoning and now carries a deferred marker pointing at the issue.
+
 ## What more time would buy
 
 In the order it would be worth doing:
@@ -286,9 +289,9 @@ In the order it would be worth doing:
    the overlay is deleted rather than ported. Everything else on this list gets smaller.
 2. **The write path against a real API** — the one gap in the live pass, and the one that needs a
    server that persists before it means anything.
-3. **The two role-locked apps and the parity script** (#13), which is the architecture claim
-   `docs/adr/0003` makes and this repo does not yet check.
-4. **The web target** (#14): static export, the tab bar becoming a sidebar at `md:`, a Vercel deploy.
+3. **The two role-locked apps and the parity script** (#13), the architecture claim
+   `docs/adr/0003` makes and nothing here checks.
+4. **The web target** (#14): a static export, the tab bar becoming a sidebar at `md:`, a deploy.
 5. **A design pass** — tab icons, which `@expo/vector-icons` would need installing for, the
    empty-state glyphs, and the visual layer checked against reference screenshots that exist.
 6. **A second Pro**, which is what would let the "somebody else holds this job" rule be asserted on a
