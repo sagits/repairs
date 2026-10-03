@@ -199,3 +199,71 @@ prompt. Detox's `postinstall` compiles its own iOS framework and XCUITest runner
 `detox build` has nothing to inject without them, so it has to run. `dtrace-provider` is bunyan's
 optional DTrace binding for log tracing; denied, so a machine without the DTrace headers still
 installs.
+
+## A `packages/*` file reaches the Expo SDK through resolver config, not through its own pin
+
+`packages/features` imports `expo-router`, which is the app's direct dependency and therefore sits in
+`apps/both/node_modules` — not on the lookup path of a file under `packages/`. Four tools had to be
+told the same two paths `metro.config.js` was already given:
+
+- `apps/both/jest.config.js` — `modulePaths`, the app's `node_modules` then the workspace root's.
+- `apps/both/tsconfig.json` — `paths`, naming `expo-router` outright. A `"*"` wildcard was tried
+  first and is wrong: it matches `react` too, resolves it straight to `node_modules/react/index.js`
+  and so skips the `@types/react` lookup, which turns every component in `packages/ui` into an
+  implicit `any`. One entry per SDK package a `packages/*` file imports, then.
+- `eslint.config.js` — the `import/resolver` node `paths`, for `packages/**` only.
+
+The alternative was declaring `expo-router` in `packages/features`, which is one line instead of
+three. It is rejected for the reason already recorded above for `react` and `react-native`: it copies
+an SDK pin that `npx expo install` only updates in one place.
+
+**And the related one: a workspace package has to be a dependency of the app to be bundled at all.**
+`metro.config.js` sets `disableHierarchicalLookup`, so Metro never looks in
+`packages/features/node_modules`; `@repairs/stores` resolves only because it is listed in
+`apps/both/package.json` and so is symlinked into the app's `node_modules`. That is why the app
+already depended on `@repairs/ui` without importing it, and `@repairs/stores` and `@repairs/types`
+join it for the same reason.
+
+## Only the Role is persisted; the person is rebuilt from it on every launch
+
+`PRD.md:363` gives `useSession` as `{ role, user, signIn, signOut }`, and the obvious reading is that
+both fields are persisted. They are not: `partialize` writes only `role`, and `merge` looks the person
+back up in `PEOPLE` on the way in.
+
+This is the PRD's own argument about `appRole` applied one field over — "persisting a constant only
+creates a stale value that can outlive a change to it". `user` is a pure function of `role`, so a
+persisted copy is a second source of truth that survives an edit to a name or an email and quietly
+contradicts the code. Two lines of `merge` cost less than that.
+
+## The splash is held in JS, because `expo-splash-screen` is not installed
+
+Requirement 2 needs the Role picker not to flash on a relaunch, and the mechanism the PRD implies is
+the native splash held past hydration. `expo-splash-screen` is not a dependency and is not in the
+dev client's `Podfile.lock`, so reaching for it would mean a new native module and a full
+`pnpm e2e:build` — for a white rectangle.
+
+`AppProviders` renders a `bg-surface` view until `useSessionHydrated()` is true instead. The launch
+storyboard's background is `systemBackgroundColor` and the app is `userInterfaceStyle: light`, so the
+held view is the same white the native splash just showed: from the outside the splash simply lasts
+a little longer, which is exactly the required behaviour. If a logo or a tinted splash is ever
+wanted, that is when `expo-splash-screen` earns its install.
+
+## Detox's `toBeVisible` does not hold for a transparent layout view
+
+The first spec to assert `toBeVisible()` on a `testID` placed on a bare container `View` — one with
+only padding and gap classes — timed out at sixty seconds while `toExist()` on the same element
+passed and its own children were visible and tappable throughout. So the view is in the hierarchy;
+Detox's visibility check just will not call a view that draws nothing visible.
+
+The rule for every spec after this one: **wait on something that draws.** A button, a label, a view
+with a background. `tab-bar` is matched happily because it carries a background and a border;
+`role-picker` was deleted rather than worked around, because the picker *is* its two buttons and a
+container that exists only to be matched is a container that did not need to exist.
+
+## The tab bar carries labels and no icons yet
+
+`PRD.md:619` specifies `MaterialCommunityIcons` from `@expo/vector-icons` in the tab bar.
+`@expo/vector-icons` is not installed — it is not a dependency of anything in the tree — and the
+acceptance criteria for the tabs are the label and the active tint, both of which are met without it.
+Adding an icon font to pass a criterion that does not mention one is work the design pass can do when
+it is looking at the thing. Recorded so it reads as deferred rather than missed.
