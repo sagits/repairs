@@ -7,9 +7,12 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@repairs/stores": "workspace:*",
+    "@repairs/types": "workspace:*",
     "@repairs/ui": "workspace:*"
   },
   "peerDependencies": {
+    "expo-router": "*",
     "nativewind": "*",
     "react": "*",
     "react-native": "*"
