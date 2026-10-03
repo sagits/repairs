@@ -1,10 +1,12 @@
 /**
- * Detox runs against the iOS simulator only, in Debug — the build that loads its JS from Metro,
- * which `scripts/e2e-test.sh` starts.
+ * Detox runs against the iOS simulator only, in Debug — the build that loads its JS from Metro, which
+ * `scripts/e2e-test.sh` starts, or reuses if one is already serving.
  *
  * **If a spec fails on a missing JS export, run `pnpm e2e:build` before debugging the spec:** this
  * binary has native code compiled in, so a changed native module needs a rebuild, not a reload.
- * `PRD.md:873` has the long version.
+ * `PRD.md:873` has the long version. The script no longer leaves that entirely to memory — it runs
+ * `detox test --reuse` and stamps each install, so a binary newer than the stamp forces a reinstall
+ * rather than letting `--reuse` keep a stale one. It cannot help you if you never rebuilt.
  *
  * `iPhone 16-Detox` and `headless` both have entries in `DECISIONS.md`.
  */
