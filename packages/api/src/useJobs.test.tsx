@@ -30,9 +30,9 @@ import type { ReactNode } from 'react';
 import { useLocalJobs, useSession } from '@repairs/stores';
 import { CLIENT_USER_ID, FIXTURE_FAILURE_ID } from '@repairs/testing';
 import type { Job } from '@repairs/types';
-import { ApiError } from './client';
+import { ApiError, API_BASE_URL } from './client';
 import { createQueryClient, jobKeys } from './queryClient';
-import { useAvailableJobs, useClientJobs } from './useJobs';
+import { useAvailableJobs, useCancelJob, useClientJobs, useJob } from './useJobs';
 
 const PRO_ID = 'pro-1';
 
@@ -40,6 +40,13 @@ let queryClient: QueryClient;
 let fetchCount = 0;
 let countingFetch: typeof globalThis.fetch;
 let underlyingFetch: typeof globalThis.fetch;
+
+/**
+ * Every request this harness saw, by method and URL. `fetchCount` answers "was the server asked again?";
+ * this answers "was it asked for the right thing?", which is the only way to tell a cancel that reached
+ * `DELETE /todos/24` from one that merely wrote the store and fired something.
+ */
+const calls: { method: string; url: string }[] = [];
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -49,15 +56,22 @@ const ids = (jobs: readonly Job[] | undefined) => (jobs ?? []).map((job) => job.
 
 beforeEach(() => {
   queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, notifyOnChangeProps: 'all' } },
+    // `mutations: { gcTime: 0 }` is what lets Jest exit: a settled mutation holds a garbage-collection
+    // timer for its `gcTime`, five minutes by default, and `queryClient.clear()` does not clear it.
+    defaultOptions: {
+      queries: { retry: false, notifyOnChangeProps: 'all' },
+      mutations: { gcTime: 0 },
+    },
   });
   useLocalJobs.setState({ created: [], claims: {}, deleted: [] });
   useSession.getState().signIn('client');
 
   fetchCount = 0;
+  calls.length = 0;
   underlyingFetch = globalThis.fetch;
   countingFetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     fetchCount += 1;
+    calls.push({ method: (init?.method ?? 'GET').toUpperCase(), url: String(input) });
     return underlyingFetch(input as RequestInfo, init);
   }) as typeof fetch;
   globalThis.fetch = countingFetch;
@@ -219,4 +233,157 @@ it('pages off the total, and shows a Local job exactly once across three loaded 
   expect(rows.filter((id) => id === 'local-1')).toEqual(['local-1']);
   expect(rows[0]).toBe('local-1');
   expect(rows).toHaveLength(52);
+});
+
+/**
+ * `useJob` — one Job, and the four answers it has to be able to give: the server's row, a Local job the
+ * server has never heard of, a claim laid over either, and "there is no such Job".
+ *
+ * **Not found is its own answer, not an error.** `PRD.md`'s states table says an unknown id gets its own
+ * screen rather than the error card, so the 404 is read here and handed back as a flag — a screen that had
+ * to unwrap an `ApiError`'s `status` itself would be the second place in the app that knows what 404 means.
+ */
+const A_CLIENT_JOB = { id: '24', title: 'Kitchen tap drips constantly' };
+
+/**
+ * One of the Client's own open Jobs as a screen would hand it to the cancel mutation — a row that has
+ * already been through the overlay, which is the only way a Job ever reaches a button.
+ */
+const anOpenJobOf = (id: string): Job => ({
+  id,
+  title: A_CLIENT_JOB.title,
+  status: 'open',
+  clientId: CLIENT_USER_ID,
+});
+
+it("gives one Job's detail from the server, mapped", async () => {
+  const { result } = await renderHook(() => useJob(A_CLIENT_JOB.id), { wrapper });
+
+  await waitFor(() => expect(result.current.job).toBeDefined());
+  expect(result.current.job).toMatchObject({
+    id: A_CLIENT_JOB.id,
+    title: A_CLIENT_JOB.title,
+    status: 'open',
+    clientId: CLIENT_USER_ID,
+  });
+  expect(result.current.notFound).toBe(false);
+});
+
+it('lays a claim over the detail as well as over the lists, with no second request', async () => {
+  const { result } = await renderHook(() => useJob(A_CLIENT_JOB.id), { wrapper });
+  await waitFor(() => expect(result.current.job).toBeDefined());
+  const fetchesSoFar = fetchCount;
+
+  await act(async () => {
+    useLocalJobs.getState().claimJob(result.current.job as Job, PRO_ID);
+  });
+
+  await waitFor(() =>
+    expect(result.current.job).toMatchObject({ status: 'claimed', proId: PRO_ID }),
+  );
+  expect(fetchCount).toBe(fetchesSoFar);
+});
+
+it('reads a Local job out of the store and never asks the server for it', async () => {
+  const local = useLocalJobs
+    .getState()
+    .createJob({ title: 'Garage door will not lift', description: 'It jams halfway' }, CLIENT_USER_ID);
+
+  const { result } = await renderHook(() => useJob(local.id), { wrapper });
+
+  await waitFor(() => expect(result.current.isPending).toBe(false));
+  expect(result.current.job).toMatchObject({ id: 'local-1', description: 'It jams halfway' });
+  expect(fetchCount).toBe(0);
+});
+
+it('reports an id the server does not have as not found, rather than as an error', async () => {
+  const { result } = await renderHook(() => useJob('9999'), { wrapper });
+
+  await waitFor(() => expect(result.current.notFound).toBe(true));
+  expect(result.current.job).toBeUndefined();
+  expect(result.current.error).toBeNull();
+});
+
+it('reports a `local-N` id nothing ever minted as not found too, without a request', async () => {
+  const { result } = await renderHook(() => useJob('local-7'), { wrapper });
+
+  await waitFor(() => expect(result.current.isPending).toBe(false));
+  expect(result.current.notFound).toBe(true);
+  expect(fetchCount).toBe(0);
+});
+
+it("surfaces the server's own words when a detail request fails outright", async () => {
+  const { result } = await renderHook(() => useJob(String(FIXTURE_FAILURE_ID)), { wrapper });
+
+  await waitFor(() => expect(result.current.error).not.toBeNull());
+  expect(result.current.notFound).toBe(false);
+  expect(result.current.error?.message).toBe(`Fixture failure seeded for id ${FIXTURE_FAILURE_ID}`);
+});
+
+/**
+ * `useCancelJob` — the fourth verb, and the one that proves the overlay generalises. The store write comes
+ * first and the request second, exactly as the create does, so every list is correct before anything is
+ * sent; a failure puts the store back.
+ */
+it("records a cancelled Job locally and tells the server, in that order", async () => {
+  const { result } = await renderHook(() => useCancelJob(), { wrapper });
+
+  await act(async () => {
+    await result.current.mutateAsync(anOpenJobOf(A_CLIENT_JOB.id));
+  });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(useLocalJobs.getState().deleted).toEqual([A_CLIENT_JOB.id]);
+  expect(calls).toEqual([{ method: 'DELETE', url: `${API_BASE_URL}/todos/${A_CLIENT_JOB.id}` }]);
+});
+
+it('cancels a Local job with no request at all, because there is nothing upstream to tell', async () => {
+  const local = useLocalJobs.getState().createJob({ title: 'Garage door will not lift' }, CLIENT_USER_ID);
+  const { result } = await renderHook(() => useCancelJob(), { wrapper });
+
+  await act(async () => {
+    await result.current.mutateAsync(local);
+  });
+
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(useLocalJobs.getState().deleted).toEqual([local.id]);
+  expect(fetchCount).toBe(0);
+});
+
+/**
+ * The rollback. The row goes back on every list the moment the request fails, which is what makes the
+ * optimistic write honest rather than a lie that happened to be told first.
+ */
+it('puts the Job back when the delete fails, and surfaces what failed', async () => {
+  const { result } = await renderHook(() => useCancelJob(), { wrapper });
+
+  await act(async () => {
+    await expect(
+      result.current.mutateAsync(anOpenJobOf(String(FIXTURE_FAILURE_ID))),
+    ).rejects.toThrow(`Fixture failure seeded for id ${FIXTURE_FAILURE_ID}`);
+  });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(useLocalJobs.getState().deleted).toEqual([]);
+});
+
+/**
+ * The guards are the store's, and this is the test that they reach a screen: the mutation fails with the
+ * store's own screen-ready sentence and **nothing is sent**, because a Job a Pro already holds is not the
+ * server's business to be told about.
+ */
+it("fails with the store's own message on a Job that is no longer open, and sends nothing", async () => {
+  const claimed = anOpenJobOf(A_CLIENT_JOB.id);
+  useLocalJobs.getState().claimJob(claimed, PRO_ID);
+  const { result } = await renderHook(() => useCancelJob(), { wrapper });
+
+  await act(async () => {
+    await expect(result.current.mutateAsync(claimed)).rejects.toThrow(
+      'A job can only be cancelled while it is open',
+    );
+  });
+
+  await waitFor(() => expect(result.current.isError).toBe(true));
+  expect(useLocalJobs.getState().deleted).toEqual([]);
+  expect(fetchCount).toBe(0);
 });

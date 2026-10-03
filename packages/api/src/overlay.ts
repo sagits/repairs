@@ -29,6 +29,15 @@ const withClaim = (job: Job, claim: ClaimRecord): Job => ({
 });
 
 /**
+ * One Job with its claim record laid on, if it has one. The smallest unit of the overlay, and the one the
+ * detail screen uses directly: a single Job needs the claims laid on and has nothing to filter.
+ */
+export const overlayClaim = (job: Job, claims: LocalJobs['claims']): Job => {
+  const claim = claims[job.id];
+  return claim ? withClaim(job, claim) : job;
+};
+
+/**
  * The per-row half of the overlay: drop what was cancelled, lay on what was claimed, then keep what
  * the scope wants. The order is not interchangeable — the available scope reads a status that only
  * exists once the claims are on, so filtering before merging would leave claimed Jobs on a Pro's list.
@@ -36,10 +45,7 @@ const withClaim = (job: Job, claim: ClaimRecord): Job => ({
 export const prepareRows = (jobs: readonly Job[], local: LocalJobs, scope: Scope): Job[] =>
   jobs
     .filter((job) => !local.deleted.includes(job.id))
-    .map((job) => {
-      const claim = local.claims[job.id];
-      return claim ? withClaim(job, claim) : job;
-    })
+    .map((job) => overlayClaim(job, local.claims))
     .filter(scope);
 
 /** The flat list, for `useQuery`. Local jobs come first, so the Job just posted is the first one seen. */

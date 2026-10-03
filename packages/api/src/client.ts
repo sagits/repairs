@@ -9,7 +9,7 @@
  * `packages/*`, so the injected import cannot resolve from here. `DECISIONS.md` has the long version.
  */
 import type { z } from 'zod';
-import { ApiErrorSchema, TodoListSchema, type Todo, type TodoList } from './schemas';
+import { ApiErrorSchema, TodoListSchema, TodoSchema, type Todo, type TodoList } from './schemas';
 
 export const API_BASE_URL = 'https://dummyjson.com';
 
@@ -89,6 +89,27 @@ export const createTodo = async (body: Omit<Todo, 'id'>): Promise<void> => {
 
   if (!response.ok) throw await errorFrom(response);
 };
+
+/**
+ * A cancel. **It returns nothing, for the same reason the create does** — `DELETE /todos/{id}` echoes the
+ * record back with an `isDeleted` flag and keeps no record of the deletion, so the only lasting account of
+ * a cancelled Job is the id in the Local job store's `deleted`. There is nothing here for a schema to
+ * protect, because nothing reads the body.
+ *
+ * A 404 still comes back as an `ApiError`, which is what lets the cancel roll the store back rather than
+ * leaving a Job hidden on the strength of a request that never landed.
+ */
+export const deleteTodo = async (id: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/todos/${id}`, { method: 'DELETE' });
+
+  if (!response.ok) throw await errorFrom(response);
+};
+
+/**
+ * One Job, for the detail screen. The 404 this answers on an unknown id is the whole reason `ApiError`
+ * carries a `status`: it is the not-found screen, where every other failure is the error card.
+ */
+export const fetchTodo = (id: string): Promise<Todo> => getJson(`/todos/${id}`, TodoSchema);
 
 /**
  * One page of every Job, for the Pro's available list. The envelope is returned whole rather than
