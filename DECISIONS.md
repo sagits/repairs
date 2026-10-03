@@ -1138,17 +1138,17 @@ of the 58 commits on `spec/repairs-mvp` carried
 with 50 of them. The orchestration notes every implementer worked from had instructed the trailer explicitly,
 which is how it ended up on all but the three earliest commits rather than on some.
 
-The choice offered was a history rewrite — `filter-branch` or `filter-repo` over 59 commits, then a
-force-push over a pushed `main` — or leaving the history and recording the deviation. **Renato chose to leave
-the history.** So:
+The choice offered was a history rewrite — `filter-branch` or `filter-repo` over the fifty-nine commits then
+in existence, then a force-push over a pushed `main` — or leaving the history and recording the deviation.
+**Renato chose to leave the history.** So:
 
 - **No rewrite and no force-push.** Rewriting a pushed branch to satisfy a metadata requirement risks the one
   thing the requirement exists to protect, which is a readable, trustworthy history.
 - **The trailer stays on the commits made after the discovery too**, including this ticket's. Switching
   spelling part way through would leave a history that is half-cleaned, which reads like an abandoned attempt
   and is harder to explain than a uniform convention with an entry against it.
-- **The halves of the requirement that did hold, held.** The author is `Renato Probst` on all 59 commits, and
-  there is no "Generated with" line anywhere in the history or in any PR description.
+- **The halves of the requirement that did hold, held.** The author is `Renato Probst` on every commit in the
+  history, and there is no "Generated with" line anywhere in it or in any PR description.
 
 The requirement's own rationale is the fairest thing to measure the outcome against: `PROMPTS.md` is where
 the use of AI is disclosed, in full and on purpose, and it is — twenty-five entries, including the
