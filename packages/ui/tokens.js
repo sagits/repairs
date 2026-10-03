@@ -20,6 +20,8 @@ const colors = {
   danger: '#E2574C',
   warning: '#F2792A',
   illustration: '#CDCBCF',
+  /** The dark wash a modal lays over the screen behind it. Ink at 45%, so it tints rather than greys. */
+  scrim: 'rgba(43, 52, 80, 0.45)',
   openGround: '#E8F0FA',
   claimedGround: '#FDF0E6',
   doneGround: '#E1F3EE',

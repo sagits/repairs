@@ -23,27 +23,9 @@ import { useForm } from 'react-hook-form';
 import { ActivityIndicator, Pressable, ScrollView, Text } from 'react-native';
 import { useCreateJob } from '@repairs/api';
 import { useNewJobDraft } from '@repairs/stores';
-import { colors, ErrorCard, FormField, HeaderBand, Screen } from '@repairs/ui';
+import { BackButton, colors, ErrorCard, FormField, HeaderBand, Screen } from '@repairs/ui';
 import { NewJobSchema, type NewJobInput } from '@repairs/types';
 import { RoleGuard } from './RoleGuard';
-
-/**
- * The way back out, and the reason the band has an `action` slot. The Stack is `headerShown: false`, so
- * without this there is no control to leave by — and leaving is the gesture the draft has to survive.
- */
-function CloseButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      testID="close-new-job"
-      accessibilityRole="button"
-      accessibilityLabel="Cancel"
-      className="rounded-card bg-primaryMuted px-4 py-2"
-      onPress={onPress}
-    >
-      <Text className="text-base font-semibold text-primaryInk">Cancel</Text>
-    </Pressable>
-  );
-}
 
 function NewJobForm() {
   const router = useRouter();
@@ -101,7 +83,16 @@ function NewJobForm() {
 
   return (
     <Screen>
-      <HeaderBand title="Post a job" action={<CloseButton onPress={() => router.back()} />} />
+      <HeaderBand
+        title="Post a job"
+        leading={
+          <BackButton
+            testID="close-new-job"
+            accessibilityLabel="Cancel"
+            onPress={() => router.back()}
+          />
+        }
+      />
       <ScrollView contentContainerClassName="gap-5 px-5 py-6" keyboardShouldPersistTaps="handled">
         {/*
           * A failed request, said as its own problem. It is a card **above** the form rather than a line

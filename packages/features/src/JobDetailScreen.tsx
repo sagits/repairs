@@ -22,10 +22,18 @@
  */
 import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useCancelJob, useClaimJob, useCompleteJob, useJob } from '@repairs/api';
 import { useSession } from '@repairs/stores';
-import { colors, ErrorCard, GlyphFrame, HeaderBand, Screen, StatusPill } from '@repairs/ui';
+import {
+  BackButton,
+  ConfirmDialog,
+  ErrorCard,
+  GlyphFrame,
+  HeaderBand,
+  Screen,
+  StatusPill,
+} from '@repairs/ui';
 import type { Job, JobStatus, User } from '@repairs/types';
 import { ActionButton } from './JobActions';
 import { asDay, CLAIM_FAILED, COMPLETE_FAILED, proName } from './jobText';
@@ -47,21 +55,6 @@ const WHY_NOT_CANCELLABLE: Partial<Record<JobStatus, string>> = {
   claimed: 'A Pro has claimed this job, so it can no longer be cancelled.',
   done: 'This job is done, so it can no longer be cancelled.',
 };
-
-/** The way back out, and the reason `HeaderBand` has an `action` slot. The Stack is `headerShown: false`. */
-function BackButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      testID="close-job-detail"
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      className="rounded-card bg-primaryMuted px-4 py-2"
-      onPress={onPress}
-    >
-      <Text className="text-base font-semibold text-primaryInk">Back</Text>
-    </Pressable>
-  );
-}
 
 /**
  * One card's worth of grey while the Job is on its way. It carries no minimum hold, unlike the list's: the
@@ -85,8 +78,8 @@ function JobDetailSkeleton() {
 }
 
 /**
- * There is no such Job — a 404 upstream, or a `local-N` this device never minted. The way out is the Back
- * button in the band, which is already on screen, so this screen adds no second one of its own.
+ * There is no such Job — a 404 upstream, or a `local-N` this device never minted. The way out is the back
+ * chevron in the band, which is already on screen, so this screen adds no second one of its own.
  */
 function JobNotFound() {
   return (
@@ -98,55 +91,6 @@ function JobNotFound() {
       <Text className="mt-1 text-center text-base leading-6 text-slate">
         It may have been cancelled, or the link may be out of date.
       </Text>
-    </View>
-  );
-}
-
-/**
- * The question, asked in the app. The confirm button carries the spinner, because the wait belongs to the
- * press that caused it, and it disables while the request is out so a second tap cannot ask twice.
- */
-function CancelConfirm({
-  pending,
-  onKeep,
-  onConfirm,
-}: {
-  pending: boolean;
-  onKeep: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <View className="rounded-card bg-surface px-4 py-4 shadow-card">
-      <Text className="text-base font-semibold text-ink">Cancel this job?</Text>
-      <Text className="mt-1 text-sm leading-5 text-inkMuted">
-        It disappears from every list for good. A Pro can no longer claim it, and posting it again is the
-        only way back.
-      </Text>
-      <View className="mt-3 flex-row gap-3">
-        <Pressable
-          testID="keep-job"
-          accessibilityRole="button"
-          accessibilityLabel="Keep it"
-          className="flex-1 items-center rounded-card border border-border py-3"
-          onPress={onKeep}
-        >
-          <Text className="text-base font-semibold text-ink">Keep it</Text>
-        </Pressable>
-        <Pressable
-          testID="confirm-cancel-job"
-          accessibilityRole="button"
-          accessibilityLabel="Cancel job"
-          accessibilityState={{ disabled: pending }}
-          disabled={pending}
-          className={`flex-1 flex-row items-center justify-center gap-2 rounded-card bg-danger py-3 ${
-            pending ? 'opacity-60' : ''
-          }`}
-          onPress={onConfirm}
-        >
-          {pending ? <ActivityIndicator testID="cancel-job-spinner" color={colors.surface} /> : null}
-          <Text className="text-base font-semibold text-surface">Cancel job</Text>
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -183,13 +127,13 @@ function CancelJob({ job }: { job: Job }) {
           message={cancelJob.error.message}
         />
       ) : null}
-      {confirming ? (
-        <CancelConfirm
-          pending={cancelJob.isPending}
-          onKeep={() => setConfirming(false)}
-          onConfirm={() => void confirm()}
-        />
-      ) : (
+      {/*
+        * The trigger goes while the question is up, rather than sitting unreachable under the scrim. It
+        * carries the same words as the confirm — "Cancel job" is the verb either way — so leaving both
+        * mounted would put the label on screen twice, which is a worse answer for a screen reader than
+        * for the eye.
+        */}
+      {confirming ? null : (
         <Pressable
           testID="cancel-job"
           accessibilityRole="button"
@@ -200,6 +144,19 @@ function CancelJob({ job }: { job: Job }) {
           <Text className="text-base font-semibold text-danger">Cancel job</Text>
         </Pressable>
       )}
+
+      <ConfirmDialog
+        visible={confirming}
+        title="Cancel this job?"
+        message="It disappears from every list for good. A Pro can no longer claim it, and posting it again is the only way back."
+        keepTestID="keep-job"
+        onKeep={() => setConfirming(false)}
+        confirmTestID="confirm-cancel-job"
+        confirmLabel="Cancel job"
+        onConfirm={() => void confirm()}
+        pending={cancelJob.isPending}
+        spinnerTestID="cancel-job-spinner"
+      />
     </View>
   );
 }
@@ -291,7 +248,16 @@ export function JobDetailScreen() {
 
   return (
     <Screen>
-      <HeaderBand title="Job" action={<BackButton onPress={() => router.back()} />} />
+      <HeaderBand
+        title="Job"
+        leading={
+          <BackButton
+            testID="close-job-detail"
+            accessibilityLabel="Back"
+            onPress={() => router.back()}
+          />
+        }
+      />
       {isPending ? (
         <JobDetailSkeleton />
       ) : notFound ? (

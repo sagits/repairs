@@ -1379,3 +1379,61 @@ All four get one, so that a missing marker never has to be interpreted:
 - **0004** — implemented, with one sentence drifted: "picking a Role signs you in" was true of the Role
   picker that `#2`'s login form replaced. The id-13 decision the ADR is about is untouched, so the sentence
   is annotated rather than rewritten.
+
+## The way back out is a drawn chevron in the band, not the navigation bar's own back button
+
+Asked for "the default arrow icon from expo navigation that shows on left area of navigation bar", which
+has two readings, and they are not close together.
+
+The literal one is `headerShown: true` on the pushed routes, which hands over the real native back button —
+arrow, swipe-back gesture, platform correctness, all free. It was not taken. The Stack's header would sit
+*above* `HeaderBand`, so either every pushed screen carries two headers or the band comes off those screens
+and the teal is tinted onto the native one instead. That second version is a bigger change than it sounds:
+the band is the status bar's backdrop by way of `pt-16`, the two pushed screens would stop looking like the
+tabbed ones, and the `testID`s four Detox specs tap would go with it in favour of a system-level matcher —
+the exact cost `Alert.alert` was turned down for twice.
+
+So the band keeps the control and the control becomes the icon. `BackButton` draws the iOS chevron out of
+two rotated `View`s, which is what the no-icon-font decision leaves available and what `GlyphFrame` already
+does for the illustrations. `HeaderBand` grew a `leading` slot beside `action` to put it on the left, where
+the ask was really about: the pill said "Back" on one screen and "Cancel" on the other, and both words moved
+into `accessibilityLabel`, so every existing assertion still finds them.
+
+## The destructive confirm is a `Modal` now, and that is what finally made it a component
+
+Twice recorded as staying inline and staying local — "nine props for two call sites" — and both entries are
+now overtaken, by a direct ask for a dialog over a dimmed screen rather than a card pushed into the layout.
+
+`Alert.alert` is still not it, for the reason it was never it: a separate element tree that React Native
+Testing Library cannot see unmocked and that Detox reaches on iOS only through system matchers. React
+Native's `Modal` is the ready-made piece that was actually wanted — it owns the window above the app, the
+fade and the hardware back button — while the contents stay ordinary views both seams drive with nothing
+stubbed. `transparent` plus one scrim `View` is the dark wash; the colour is a new `scrim` token, ink at 45%.
+
+That plumbing is what tipped the extraction. The duplication before was twenty lines of JSX neither screen
+had an opinion about losing; the duplication now would include the window, the scrim, the centring and the
+hardware-back path, which is chrome, not content. `ConfirmDialog` lives in `@repairs/ui` and both callers
+pass their own words and `testID`s. The scrim is deliberately not pressable — every caller is asking before
+something irreversible, and a stray tap outside is not consent.
+
+One consequence worth naming: on the Job screen the trigger and the confirm are both labelled "Cancel job",
+so the trigger unmounts while the question is up rather than sitting unreachable under the scrim. Two
+identical labels on screen at once is worse for a screen reader than for the eye.
+
+## Settings is a profile, not a titled list
+
+Asked for the shape in the reference screenshot: the teal running down behind a round avatar, the name and
+the address on it, and one white card lapping over the bottom of the band with every action as a row.
+`HeaderBand` came off this screen entirely — there is no "Settings" title in that shape, and the tab bar
+already says where you are.
+
+The avatar is drawn rather than shipped. There is no avatar upstream, so a bundled photograph would be
+fiction and initials in a circle would be a different person's every Role switch; a silhouette clipped by
+its circle is the honest generic, and it is `View`s for the same want of an icon font as everything else.
+
+What the rows do not have is the reference's leading icons, for that same reason — hand-drawing ten of them
+would be ten illustrations, not a layout. The row labels carry it alone. Nor is there a "Check for updates"
+footer: there is no update channel to check.
+
+The rows are built as a list and mapped, rather than written out, because which of them exist is the one
+variable thing on the screen — the Role lock takes the first away — and the dividers have to follow it.

@@ -1,4 +1,6 @@
 /** The public surface of the design system. Apps and features import from here, never from a file. */
+export { BackButton } from './BackButton';
+export { ConfirmDialog } from './ConfirmDialog';
 export { ErrorCard } from './ErrorCard';
 export { FormField } from './FormField';
 export { GlyphFrame } from './GlyphFrame';
