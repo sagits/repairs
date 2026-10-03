@@ -6,4 +6,4 @@
  */
 export type { AppRole, Role, User } from './people';
 export type { Actor, ClaimRecord, Job, JobStatus, LocalJobs, Scope } from './jobs';
-export { NewJobSchema, type NewJobInput } from './schemas';
+export { LoginSchema, NewJobSchema, type LoginInput, type NewJobInput } from './schemas';

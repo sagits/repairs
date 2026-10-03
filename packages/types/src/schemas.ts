@@ -30,3 +30,20 @@ export const NewJobSchema = z.object({
 });
 
 export type NewJobInput = z.infer<typeof NewJobSchema>;
+
+/**
+ * The login boundary. It is deliberately the thinnest check that can be called validation: the email
+ * has to look like an email and the password has to be something rather than nothing. There is no
+ * credential to check it against — `useSession` still holds two hardcoded people and the Role switch
+ * on the form is what decides which of them you become — so anything past "is this plausibly filled
+ * in" would be the form pretending to an authority it does not have.
+ *
+ * The messages are the exact words under the field, same contract as `NewJobSchema`'s: rewording one
+ * is a user-visible change and the tests assert on it so that it reads as one in a diff.
+ */
+export const LoginSchema = z.object({
+  email: z.email('Enter a valid email address'),
+  password: z.string().min(1, 'Enter your password'),
+});
+
+export type LoginInput = z.infer<typeof LoginSchema>;
