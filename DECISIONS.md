@@ -1173,3 +1173,107 @@ Worth noting for the next person who writes one: the README is the only document
 be *reduced* in scope to stay honest and then grown back. `DECISIONS.md` and `PROMPTS.md` only ever grow,
 because an entry is true of the moment it was written. A README is in the present tense, and that is what
 makes it the document most likely to be quietly wrong.
+
+## The Role picker becomes a credential form, so issue #2's acceptance no longer describes how you sign in
+
+Asked for directly on 2026-10-03, after the sixteen tickets were done, against a mockup Renato supplied.
+It has no issue of its own; this entry and its commits are the record.
+
+**Issue #2's acceptance said "Picking a Role signs you in as that Role's hardcoded person". That is no
+longer true.** `LoginScreen` is an email field, a masked password, a Show Password link, a Client/Pro
+switch and a Login button. What *is* still true is the half that matters: there are still exactly two
+hardcoded people, and which one you become is still decided by a Role and nothing else — the switch has
+simply taken the two buttons' job.
+
+**The validation is deliberately the thinnest thing that counts as validation**: `LoginSchema` asks that
+the email look like an email and the password be non-empty, and that is the whole check. There is nothing
+to check a credential *against*, so any valid-looking pair signs you in. Anything more would be the form
+claiming an authority it does not have.
+
+**Neither the email nor the password is stored.** `handleSubmit` reads both and drops them; `useSession`
+still persists only the Role and still rebuilds the person from it on every launch, which is an earlier
+entry's invariant and the one thing this change was most able to break. `LoginScreen.test.tsx` asserts it
+against AsyncStorage directly rather than against the store, because a store that has forgotten the email
+is not the same claim as an email that was never written down.
+
+**Three deviations from the mockup, all deliberate:**
+
+- **The field is labelled "Email", not "Username".** The mockup says Username and the validation says
+  email, and a field that rejects a username for not being an email address is a field lying to the person
+  filling it in. One of the two had to move and the label was the cheaper one. **Overrulable in one line**
+  — change the label and `LoginSchema`'s `email` to a non-empty string together, or this reverses into the
+  same lie.
+- **The colours are ours.** The mockup is blue throughout; the palette is mint. `primary` for the Login
+  button, `ink`/`inkMuted` for text and placeholders, `border` for the field outlines, `danger` for the
+  messages. `accent` `#1E68BF` — the one blue we own — is spent on the Show Password link, because reading
+  as a link is that control's entire job. `#007AFF` appears nowhere.
+- **No icons.** The mockup's person and padlock glyphs need `@expo/vector-icons`, which is deliberately not
+  installed, for the same reason the tab bar still carries labels and no icons. A glyph is not worth a
+  native module and the `pnpm e2e:build` that would come with it.
+
+**The Role is a segmented pair rather than a boolean `Switch`**, which was the other reading of "a switch
+that chooses Client or Pro". React Native's `Switch` is less code and was considered first, but it has an
+off state and an on state, so it would have had to nominate one Role as the default and the other as the
+deviation from it. The two Roles are symmetric — they are what two equal buttons used to be — and a
+segmented pair keeps both of them on screen and selectable. It sits *above* the Login button, because
+everything the press depends on belongs above the thing you press.
+
+## `FormField` moves into `@repairs/ui`, because the second form arrived
+
+This supersedes "The new-job form keeps `FormField` local and drops the debounce, both against `PRD.md`",
+and it supersedes exactly the half that entry hedged: "**If a second form ever arrives, that is the move:**
+lift it to `packages/ui`, add `react-hook-form` to that package's peers, and the call sites do not change."
+The login form is that second form, so that is what happened, and the entry's prediction held — the call
+sites gained one prop each and changed nothing else.
+
+The argument for keeping it local was never that a shared field component is wrong, it was that a design
+system should not acquire a React Hook Form dependency for a single consumer. Two consumers is a different
+sentence. The error treatment is now one declaration again instead of two that drift, which was `PRD.md`'s
+point in the first place.
+
+Two things changed in the lift. It is **generic over the form's values** (`FieldValues`, `FieldPath`)
+rather than typed to `NewJobInput`, which would have made it a new-job component living in the wrong
+package. And **`testID` is a prop** rather than derived from the field name: the ids are what the Detox
+specs drive, and two forms both minting `field-${name}` would collide the first time they shared a field
+name. The pass-through props it gained — `secureTextEntry`, `keyboardType`, `autoCapitalize`, `autoCorrect`
+— are only the ones the two call sites actually use; `autoCorrect` in particular is a prop rather than a
+blanket `false` so that lifting the component did not silently change the new-job form's typing behaviour.
+
+The debounce half of the superseded entry still stands untouched. Nothing about a second form makes a
+timer around a draft write earn its keep.
+
+## A masked password reads its real text back to Detox, so the reveal is asserted in Jest
+
+The obvious device assertion for Show Password is `toHaveText` on the password field, masked and then
+revealed. It was written that way first, and then checked in the opposite direction — the technique that
+caught the deep-link hole in `#6` and the reset-link no-op in the harness entry. **It does not work.** iOS
+hands Detox the field's real characters whether or not `secureTextEntry` is on, so
+`expect(element(by.id('login-password'))).toHaveText('hunter2')` passes while the screen is plainly showing
+bullets, and `not.toHaveText` fails against a masked field. Nothing Detox can see distinguishes the two
+states: the `secureTextEntry` prop is not exposed, and both states are the same native class.
+
+So the two halves of the behaviour are asserted in the two places that can see them. `login.e2e.ts` taps the
+link and asserts it says what state it is in — `Show Password` becoming `Hide Password` and back — which is
+the control working. `LoginScreen.test.tsx` reads `secureTextEntry` off the input and asserts it flips, which
+is the masking. **Anyone reaching for `toHaveText` here again will get a green test that proves nothing**,
+which is the whole reason this is written down.
+
+## Signing in became four `testID`s, so it is one shared Detox module instead of eight copies
+
+Every spec in the suite signs in and none of them is about signing in. That was one `tap()` per spec when the
+screen was a picker; it is two `replaceText`s, a conditional tap on the Role switch and a submit now, which is
+eight places to edit the next time the form moves a control. So `apps/both/e2e/sign-in.ts` holds `signIn(role)`
+and the `LOGIN_FORM` id, and the seven specs whose subject is something else import it. `login.e2e.ts`
+deliberately does **not**: that spec is about the form, so it spells out every step, because a helper there
+would hide the thing under test.
+
+Each spec keeps its own `VISIBLE_WITHIN` and `waitForVisible`. Those are each spec's own statement about what
+it waits for and how long that is worth, and the shared module has no business overriding them — it exports an
+id to wait on, not a wait. `jest.config.js`'s `testMatch` is `*.e2e.ts`, so a helper file beside the specs is
+not picked up as one.
+
+**`replaceText`, not `typeText`, for both fields**, here and in `login.e2e.ts`. iOS autocorrect rewrites a
+part-typed word when the field loses focus, which against an email field is the difference between a green run
+and a mysterious "Enter a valid email address". `typeText` stays where the keystroke itself is the assertion,
+which is `new-job.e2e.ts`'s "says nothing about a short title while it is being typed" and nowhere on this
+screen.

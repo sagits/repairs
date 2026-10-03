@@ -3,7 +3,7 @@
  *
  * It matters because storage is asynchronous: for the first frames of a launch a persisted store
  * honestly reports its initial state when what it means is "not yet asked", and rendering on that
- * answer is how a Role picker flashes at someone already signed in, or a claimed Job shows as open.
+ * answer is how a login form flashes at someone already signed in, or a claimed Job shows as open.
  *
  * Hydration is an external event with a snapshot and a subscription, which is precisely what
  * `useSyncExternalStore` is for. `useState` plus an effect would have to re-check for a hydration that

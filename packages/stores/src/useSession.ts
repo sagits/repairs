@@ -9,8 +9,9 @@ import type { Role, User } from '@repairs/types';
 import { createHydrationHook } from './hydration';
 
 /**
- * The two hardcoded people. There is no sign up and no credentials: picking a Role *is* signing in,
- * so each Role has exactly one person behind it.
+ * The two hardcoded people. There is no sign up and nothing to check a credential against: the login form
+ * validates an email and a password and then throws both away, and its Client/Pro switch is what decides
+ * which of these two you become — so each Role still has exactly one person behind it.
  *
  * The Client's `13` is a real DummyJSON `userId` and is not arbitrary — it is the one id whose todos
  * give the Client list four open jobs and two done ones with nothing seeded. `PRD.md`'s Identity
@@ -60,7 +61,7 @@ export const useSession = create<SessionState>()(
 /**
  * Whether the persisted Role has been read back yet. Storage is asynchronous, so for the first frames
  * of a launch the store says "signed out" when what it means is "not yet asked" — rendering on that
- * answer is what flashes the Role picker at someone who is already signed in, and `AppProviders` holds
+ * answer is what flashes the login form at someone who is already signed in, and `AppProviders` holds
  * the splash on this. `hydration.ts` has the rest of the reasoning; the Local job store needs the same
  * hook for the same reason, which is why it is shared rather than written out twice.
  */

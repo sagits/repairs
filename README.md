@@ -39,8 +39,11 @@ and `packages/api/src/overlay.ts` is deleted rather than ported.
 
 ## What it does
 
-**Signing in** is the Role picker, and the Role is persisted, so a full restart comes back signed in
-with no flash of the picker on the way.
+**Signing in** is an email and a password, validated but checked against nothing: there are two
+hardcoded people and a Client/Pro switch on the form decides which of them any valid-looking pair
+signs you in as. Neither the email nor the password is stored anywhere — only the Role is persisted,
+and the person is rebuilt from it on every launch, so a full restart comes back signed in with no
+flash of the login form on the way.
 
 **The tabs are derived from the Role** by one custom tab bar: a Client gets My Jobs and Settings, a
 Pro gets Available, My Jobs and Settings. `index` is the one route both Roles reach under different

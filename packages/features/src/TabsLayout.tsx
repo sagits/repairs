@@ -1,6 +1,6 @@
 /**
  * The tabs, and the gate in front of them: no Role means nobody is signed in, so there is nothing to
- * derive a tab list from and the Role picker is where you belong. This is also the adapter between
+ * derive a tab list from and the login form is where you belong. This is also the adapter between
  * Expo Router's tab bar props and `RoleTabBar`, which is the only place those two shapes meet.
  */
 import { Redirect, Tabs } from 'expo-router';
