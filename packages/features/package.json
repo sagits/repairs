@@ -7,11 +7,13 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@repairs/api": "workspace:*",
     "@repairs/stores": "workspace:*",
     "@repairs/types": "workspace:*",
     "@repairs/ui": "workspace:*"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "*",
     "expo-router": "*",
     "nativewind": "*",
     "react": "*",
